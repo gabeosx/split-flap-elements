@@ -75,6 +75,7 @@ const status = document.querySelector("#builder-status");
 const generatedCode = document.querySelector("#generated-code");
 const previewPanel = document.querySelector("#preview-panel");
 let builderPlayTimer;
+let activeBuilderConfiguration = null;
 
 function splitGraphemes(value) {
   if (!segmenter) return Array.from(value);
@@ -155,11 +156,15 @@ function setupSample(sample) {
   const cellCount = Math.max(...tokenFrames.map((frame) => frame.length));
   const fill = isCustom ? sample.reel[0] : " ";
   for (let index = 0; index < cellCount; index += 1) {
+    const target = tokenFrames[0][index] ?? fill;
+    const restingValue = isCustom
+      ? (sample.reel.find((value) => value !== target) ?? target)
+      : " ";
     sampleBoard.append(
       createCell(`cell-${index}`, {
         preset: isCustom ? undefined : sample.id,
         reel: sample.reel,
-        value: tokenFrames[0][index] ?? fill,
+        value: restingValue,
         span: isCustom ? (sample.id === "custom-words" ? 5 : 2) : 1,
       }),
     );
@@ -250,19 +255,38 @@ function showStatus(message, isError = false) {
   status.classList.toggle("is-error", isError);
 }
 
+function restingValueFor(configuration, index) {
+  if (!configuration.reel) return " ";
+  const target = configuration.frames[0][index] ?? configuration.fill;
+  return (
+    configuration.reel.find((value) => value !== target) ?? configuration.fill
+  );
+}
+
+function replayBuilder() {
+  if (!activeBuilderConfiguration) return;
+  window.clearTimeout(builderPlayTimer);
+  board.stop();
+  board.cells.forEach((cell, index) => {
+    cell.value = restingValueFor(activeBuilderConfiguration, index);
+  });
+  void board.replay();
+}
+
 function renderBuilder() {
   window.clearTimeout(builderPlayTimer);
   board.stop();
   board.replaceChildren();
   try {
     const configuration = builderConfiguration();
+    activeBuilderConfiguration = configuration;
     const controls = controlsFromForm();
     for (let index = 0; index < configuration.cellCount; index += 1) {
       board.append(
         createCell(`cell-${index}`, {
           preset: configuration.reel ? undefined : configuration.preset,
           reel: configuration.reel,
-          value: configuration.frames[0][index] ?? configuration.fill,
+          value: restingValueFor(configuration, index),
         }),
       );
     }
@@ -277,9 +301,14 @@ function renderBuilder() {
     generatedCode.textContent = codeFor(configuration, sequence);
     document.querySelector("#cell-count").textContent =
       `${configuration.cellCount} ${configuration.cellCount === 1 ? "cell" : "cells"}`;
-    showStatus(`${configuration.frames.length} live frames. Code is ready.`);
+    const frameLabel =
+      configuration.frames.length === 1
+        ? "1 live frame. Replay resets and spins it again."
+        : `${configuration.frames.length} live frames. Code is ready.`;
+    showStatus(frameLabel);
     builderPlayTimer = window.setTimeout(() => board.play(), 80);
   } catch (error) {
+    activeBuilderConfiguration = null;
     generatedCode.textContent =
       "// Fix the configuration above to generate code.";
     document.querySelector("#cell-count").textContent = "Invalid configuration";
@@ -292,7 +321,7 @@ function syncPresetFields() {
   document.querySelector(".custom-reel-field").hidden = !isCustom;
   document.querySelector("#frames-help").textContent = isCustom
     ? "One frame per line; use | between cells"
-    : "One frame per line";
+    : "One animation frame per line";
 }
 
 function updateOutputs() {
@@ -317,7 +346,7 @@ themeInput.addEventListener("change", () => {
 
 document
   .querySelector("#preview-replay")
-  .addEventListener("click", () => board.replay());
+  .addEventListener("click", replayBuilder);
 document.querySelector("#preview-pause").addEventListener("click", (event) => {
   if (board.playbackState === "paused") board.resume();
   else board.pause();

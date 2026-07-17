@@ -55,6 +55,46 @@ test("the builder updates its preview and generated code", async ({ page }) => {
   ).toBeVisible();
 });
 
+test("a single phrase animates from blanks and replays", async ({ page }) => {
+  await page.goto("/playground/");
+  await page.locator("#builder-board").evaluate((element) => {
+    (window as any).builderFlipCount = 0;
+    element.addEventListener("sfe-flip", () => {
+      (window as any).builderFlipCount += 1;
+    });
+  });
+
+  await page.locator("#builder-preset").selectOption("alpha");
+  await page.locator("#builder-spin").fill("160");
+  await page.locator("#builder-frames").fill("NEW YORK");
+  await page.evaluate(() => ((window as any).builderFlipCount = 0));
+
+  await expect(page.locator("#builder-board sfe-cell")).toHaveCount(8);
+  await expect
+    .poll(() => page.evaluate(() => (window as any).builderFlipCount))
+    .toBeGreaterThan(0);
+  await expect
+    .poll(() =>
+      page
+        .locator("#builder-board")
+        .evaluate((element: any) =>
+          element.cells.map((cell: any) => cell.value).join(""),
+        ),
+    )
+    .toBe("NEW YORK");
+  const flipsAfterFirstPlay = await page.evaluate(
+    () => (window as any).builderFlipCount,
+  );
+
+  await page.locator("#preview-replay").click();
+  await expect
+    .poll(() => page.evaluate(() => (window as any).builderFlipCount))
+    .toBeGreaterThan(flipsAfterFirstPlay);
+  await expect(page.locator("#builder-status")).toContainText(
+    "Replay resets and spins it again",
+  );
+});
+
 test("custom reels validate values and generate setup code", async ({
   page,
 }) => {
