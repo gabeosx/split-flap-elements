@@ -46,7 +46,7 @@ jobs:
           npm run pack:check
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
           test "$PACKAGE_VERSION" = "$RELEASE_VERSION"
-          grep -F "## [$RELEASE_VERSION]" CHANGELOG.md
+          grep -F "## $RELEASE_VERSION (" CHANGELOG.md
           PACKAGE_FILE=$(npm pack --json | node -e "let input=''; process.stdin.on('data', c => input += c).on('end', () => process.stdout.write(JSON.parse(input)[0].filename))")
           shasum -a 256 "$PACKAGE_FILE" > "$PACKAGE_FILE.sha256"
           echo "file=$PACKAGE_FILE" >> "$GITHUB_OUTPUT"
