@@ -1,6 +1,12 @@
 import { expect, test } from "@playwright/test";
 
 test("the departure demo loads and plays", async ({ page }) => {
+  const failures: string[] = [];
+  page.on("pageerror", (error) => failures.push(error.message));
+  page.on("response", (response) => {
+    if (response.status() >= 400)
+      failures.push(`${response.status()} ${response.url()}`);
+  });
   await page.goto("/");
   const board = page.locator("sfe-board");
   await expect(board).toBeVisible();
@@ -8,6 +14,8 @@ test("the departure demo loads and plays", async ({ page }) => {
   await expect
     .poll(() => board.evaluate((element: any) => element.playbackState))
     .toBe("playing");
+  await expect(page.locator("#clock")).not.toHaveText("--:--:--");
+  expect(failures).toEqual([]);
 });
 
 test("controls expose playback and presentation choices", async ({ page }) => {
