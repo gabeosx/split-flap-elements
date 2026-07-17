@@ -1,5 +1,41 @@
 import { expect, test } from "@playwright/test";
 
+test("the departure demo randomizes every starting reel position", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    let randomIndex = 0;
+    Math.random = () => ((randomIndex++ % 9) + 0.5) / 10;
+    const nativeSetTimeout = window.setTimeout.bind(window);
+    window.setTimeout = ((
+      handler: TimerHandler,
+      timeout?: number,
+      ...arguments_: any[]
+    ) =>
+      nativeSetTimeout(
+        handler,
+        timeout === 450 ? 5_000 : timeout,
+        ...arguments_,
+      )) as typeof window.setTimeout;
+  });
+  await page.goto("/");
+
+  const starts: { name: string; value: string; target: string }[] = await page
+    .locator("sfe-board")
+    .evaluate((element: any) => {
+      const firstFrame = element.sequence[0].values;
+      return element.cells.map((cell: any) => ({
+        name: cell.name,
+        value: cell.value,
+        target: firstFrame[cell.name],
+      }));
+    });
+
+  expect(starts).toHaveLength(32);
+  expect(starts.every(({ value, target }) => value !== target)).toBe(true);
+  expect(new Set(starts.map(({ value }) => value)).size).toBeGreaterThan(1);
+});
+
 test("the departure demo loads and plays", async ({ page }) => {
   const failures: string[] = [];
   page.on("pageerror", (error) => failures.push(error.message));

@@ -91,7 +91,22 @@ function updateSequence() {
   );
 }
 
+function randomizeStartingPositions() {
+  const firstFrame = board.sequence[0]?.values;
+  if (!firstFrame) return;
+
+  for (const cell of board.cells) {
+    const target = firstFrame[cell.name];
+    const alternatives = cell.reel.filter((value) => value !== target);
+    if (alternatives.length > 0) {
+      cell.value =
+        alternatives[Math.floor(Math.random() * alternatives.length)];
+    }
+  }
+}
+
 updateSequence();
+randomizeStartingPositions();
 board.loop = true;
 
 document.querySelector("#play").addEventListener("click", () => board.play());
