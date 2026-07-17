@@ -7,7 +7,12 @@ Configurable, accessible split-flap displays built with Web Components. Use lett
 
 [![Fictional departure board demonstrating split-flap-elements](./assets/demo.gif)](https://gabeosx.github.io/split-flap-elements/)
 
-**[Open the interactive demo](https://gabeosx.github.io/split-flap-elements/)**
+**[Open the interactive demo](https://gabeosx.github.io/split-flap-elements/)** ·
+**[Explore presets and build a board](https://gabeosx.github.io/split-flap-elements/playground/)**
+
+The playground includes live samples for every built-in preset plus custom word
+and emoji reels. Its visual builder turns frames, timing, settle order, looping,
+and panel choices into a working preview and copyable HTML.
 
 ## Install
 
@@ -109,6 +114,23 @@ Settle orders:
 - `center-out`
 - `edges-in`
 - A custom array of cell indexes. Nested arrays settle as one group; omitted cells are appended in document order.
+
+All targeted cells begin spinning together. The settle order controls when each
+cell stops, and `stagger` sets the minimum delay between stop groups. With
+`simultaneous`, every cell starts and stops together.
+
+Set initial positions before playback when you want each reel to enter from a
+different point:
+
+```js
+const firstFrame = board.sequence[0].values;
+for (const cell of board.cells) {
+  const choices = cell.reel.filter((value) => value !== firstFrame[cell.name]);
+  if (choices.length > 0) {
+    cell.value = choices[Math.floor(Math.random() * choices.length)];
+  }
+}
+```
 
 Playback methods are `play()`, `pause()`, `resume()`, `stop()`, `replay()`, `next()`, `previous()`, and `seek(index)`.
 

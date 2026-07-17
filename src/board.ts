@@ -249,25 +249,44 @@ export class SfeBoard extends HTMLElement {
       cells.length,
     );
     const stagger = Math.max(0, frame.stagger ?? 90);
+    const activeGroups = groups
+      .map((group) =>
+        group.filter((cellIndex) => {
+          const cell = cells[cellIndex];
+          return cell && frame.values[cell.name] !== undefined;
+        }),
+      )
+      .filter((group) => group.length > 0);
 
-    for (let groupIndex = 0; groupIndex < groups.length; groupIndex += 1) {
-      if (signal.aborted) return false;
-      await this.#whilePaused(signal);
-      const group = groups[groupIndex]!;
-      const work = group.map(async (cellIndex) => {
-        const cell = cells[cellIndex];
-        if (!cell) return true;
-        const target = frame.values[cell.name];
-        if (target === undefined) return true;
+    let previousDuration = 0;
+    const schedule = activeGroups.map((group, groupIndex) => {
+      const requestedDuration = Math.max(
+        ...group.map((cellIndex) => {
+          const cell = cells[cellIndex]!;
+          const timing = this.#timingFor(frame.timing, cell.name);
+          return Math.max(0, timing.spinDuration ?? cell.spinDuration);
+        }),
+      );
+      const spinDuration =
+        groupIndex === 0
+          ? requestedDuration
+          : Math.max(requestedDuration, previousDuration + stagger);
+      previousDuration = spinDuration;
+      return { group, spinDuration };
+    });
+
+    await this.#whilePaused(signal);
+    if (signal.aborted) return false;
+    const work = schedule.flatMap(({ group, spinDuration }) =>
+      group.map((cellIndex) => {
+        const cell = cells[cellIndex]!;
+        const target = frame.values[cell.name]!;
         const timing = this.#timingFor(frame.timing, cell.name);
-        return cell.spinTo(target, { ...timing, signal });
-      });
-      const results = await Promise.all(work);
-      if (results.some((result) => !result)) return false;
-      if (groupIndex < groups.length - 1) {
-        await delay(stagger, signal, () => this.#whilePaused(signal));
-      }
-    }
+        return cell.spinTo(target, { ...timing, spinDuration, signal });
+      }),
+    );
+    const results = await Promise.all(work);
+    if (results.some((result) => !result)) return false;
 
     if (signal.aborted) return false;
     emit(this, "sfe-frame-settle", { frame: index });

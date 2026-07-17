@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Explore split-flap reel presets and build a working board without writing configuration by hand."
+    />
+    <title>Preset gallery + builder — split-flap-elements</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./playground.js"></script>
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="wordmark" href="../">split-flap-elements</a>
+      <nav aria-label="Playground navigation">
+        <a href="#presets">Presets</a>
+        <a href="#builder">Builder</a>
+        <a href="https://github.com/gabeosx/split-flap-elements">GitHub ↗</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">Configuration desk / live</p>
+          <h1 id="page-title">Set the reel.<br />Get the code.</h1>
+        </div>
+        <p class="hero-copy">
+          Inspect every built-in character set, then configure a working board
+          in the browser. The preview and generated snippet use the same public
+          API.
+        </p>
+      </section>
+
+      <section class="presets" id="presets" aria-labelledby="preset-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Reel manifest</p>
+            <h2 id="preset-title">Live samples</h2>
+          </div>
+          <p>
+            Built-ins cover common characters. Custom reels accept any
+            plain-text token.
+          </p>
+        </div>
+        <div class="preset-grid" id="preset-grid"></div>
+      </section>
+
+      <section class="builder" id="builder" aria-labelledby="builder-title">
+        <div class="builder-heading">
+          <div>
+            <p class="eyebrow">Board builder</p>
+            <h2 id="builder-title">Configure and copy</h2>
+          </div>
+          <p
+            id="builder-status"
+            class="status"
+            role="status"
+            aria-live="polite"
+          >
+            Preview ready.
+          </p>
+        </div>
+
+        <div class="workbench">
+          <form class="control-desk" id="builder-form">
+            <fieldset>
+              <legend>Content</legend>
+              <label>
+                Character set
+                <select id="builder-preset" name="preset">
+                  <option value="alpha">Alpha</option>
+                  <option value="numeric">Numeric</option>
+                  <option value="alphanumeric" selected>Alphanumeric</option>
+                  <option value="symbols">Symbols</option>
+                  <option value="custom">Custom reel</option>
+                </select>
+              </label>
+              <label class="custom-reel-field" hidden>
+                Custom reel <span>Separate tokens with |</span>
+                <input
+                  id="builder-reel"
+                  name="reel"
+                  value="READY|BOARDING|LAST CALL|✓"
+                  spellcheck="false"
+                />
+              </label>
+              <label class="frames-field">
+                Words or phrases
+                <span id="frames-help">One animation frame per line</span>
+                <textarea
+                  id="builder-frames"
+                  name="frames"
+                  rows="5"
+                  spellcheck="false"
+                >
+GATE7
+A12B3
+READY</textarea>
+              </label>
+            </fieldset>
+
+            <fieldset class="settings-grid">
+              <legend>Motion</legend>
+              <label>
+                Settle order
+                <select id="builder-order" name="order">
+                  <option value="forward">Forward</option>
+                  <option value="reverse">Reverse</option>
+                  <option value="simultaneous">Together</option>
+                  <option value="center-out" selected>Center out</option>
+                  <option value="edges-in">Edges in</option>
+                </select>
+              </label>
+              <label>
+                Starting position
+                <select id="builder-start" name="start">
+                  <option value="random" selected>Random</option>
+                  <option value="blank">Blank</option>
+                </select>
+              </label>
+              <label>
+                Spin <output id="spin-output">720 ms</output>
+                <input
+                  id="builder-spin"
+                  name="spin"
+                  type="range"
+                  min="0"
+                  max="1600"
+                  step="40"
+                  value="720"
+                />
+              </label>
+              <label>
+                Hold <output id="hold-output">1800 ms</output>
+                <input
+                  id="builder-hold"
+                  name="hold"
+                  type="range"
+                  min="300"
+                  max="4000"
+                  step="100"
+                  value="1800"
+                />
+              </label>
+              <label>
+                Stagger <output id="stagger-output">60 ms</output>
+                <input
+                  id="builder-stagger"
+                  name="stagger"
+                  type="range"
+                  min="0"
+                  max="240"
+                  step="10"
+                  value="60"
+                />
+              </label>
+              <label>
+                Panel
+                <select id="builder-theme" name="theme">
+                  <option value="terminal">Terminal</option>
+                  <option value="paper">Paper</option>
+                  <option value="signal">Signal</option>
+                </select>
+              </label>
+              <label class="check-control">
+                <input id="builder-loop" name="loop" type="checkbox" checked />
+                Loop sequence
+              </label>
+            </fieldset>
+          </form>
+
+          <div class="preview-column">
+            <section
+              class="preview-panel theme-terminal"
+              id="preview-panel"
+              aria-labelledby="preview-title"
+            >
+              <div class="panel-label">
+                <h3 id="preview-title">Live preview</h3>
+                <span id="cell-count">5 cells</span>
+              </div>
+              <div class="board-stage">
+                <sfe-board
+                  id="builder-board"
+                  announce
+                  aria-label="Builder preview"
+                ></sfe-board>
+              </div>
+              <div class="preview-actions">
+                <button type="button" id="preview-replay">Replay</button>
+                <button type="button" id="preview-pause">Pause</button>
+                <button
+                  type="button"
+                  id="preview-previous"
+                  aria-label="Previous preview frame"
+                >
+                  ←
+                </button>
+                <button
+                  type="button"
+                  id="preview-next"
+                  aria-label="Next preview frame"
+                >
+                  →
+                </button>
+              </div>
+            </section>
+
+            <section class="code-ticket" aria-labelledby="code-title">
+              <div class="ticket-heading">
+                <div>
+                  <p class="eyebrow">Ready to paste</p>
+                  <h3 id="code-title">Generated HTML</h3>
+                </div>
+                <button type="button" id="copy-code">Copy code</button>
+              </div>
+              <pre><code id="generated-code"></code></pre>
+            </section>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>Everything on this page runs locally.</span>
+      <a href="../">Back to departure demo</a>
+    </footer>
+  </body>
+</html>
