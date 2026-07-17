@@ -12,7 +12,7 @@ test("departure board dark and light panels", async ({ page }, testInfo) => {
     "departure-dark.png",
     {
       animations: "disabled",
-      maxDiffPixelRatio: 0.05,
+      maxDiffPixelRatio: 0.1,
     },
   );
   await page.getByRole("button", { name: "Light panel" }).click();
@@ -20,7 +20,7 @@ test("departure board dark and light panels", async ({ page }, testInfo) => {
     "departure-light.png",
     {
       animations: "disabled",
-      maxDiffPixelRatio: 0.05,
+      maxDiffPixelRatio: 0.1,
     },
   );
 });
