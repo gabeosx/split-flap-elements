@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npm run validate
+
+      - id: release
+        uses: googleapis/release-please-action@v5
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      - if: steps.release.outputs.release_created == 'true'
+        name: Check out the released commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.release.outputs.sha }}
+
+      - if: steps.release.outputs.release_created == 'true'
+        name: Build release artifact
+        id: artifact
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          npm ci
+          npm run pack:check
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          test "$PACKAGE_VERSION" = "$RELEASE_VERSION"
+          grep -F "## [$RELEASE_VERSION]" CHANGELOG.md
+          PACKAGE_FILE=$(npm pack --json | node -e "let input=''; process.stdin.on('data', c => input += c).on('end', () => process.stdout.write(JSON.parse(input)[0].filename))")
+          shasum -a 256 "$PACKAGE_FILE" > "$PACKAGE_FILE.sha256"
+          echo "file=$PACKAGE_FILE" >> "$GITHUB_OUTPUT"
+
+      - if: steps.release.outputs.release_created == 'true'
+        name: Attach package to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ steps.release.outputs.tag_name }}
+          PACKAGE_FILE: ${{ steps.artifact.outputs.file }}
+        run: gh release upload "$TAG_NAME" "$PACKAGE_FILE" "$PACKAGE_FILE.sha256" --clobber
+
+      - if: steps.release.outputs.release_created == 'true' && vars.NPM_PUBLISH_ENABLED == 'true'
+        name: Publish to npm through OIDC
+        env:
+          PACKAGE_FILE: ${{ steps.artifact.outputs.file }}
+        run: npm publish "$PACKAGE_FILE" --access public

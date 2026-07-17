@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="A live demonstration of split-flap-elements."
+    />
+    <title>Split Flap Elements</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./demo.js"></script>
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="wordmark" href="https://github.com/gabeosx/split-flap-elements"
+        >split-flap-elements</a
+      >
+      <span>Web Components / zero dependencies</span>
+    </header>
+
+    <main>
+      <section class="console" aria-labelledby="demo-heading">
+        <div class="console-heading">
+          <div>
+            <p class="kicker">Live departures</p>
+            <h1 id="demo-heading">Every character,<br />on your schedule.</h1>
+          </div>
+          <p class="clock" aria-label="Local time">
+            <span id="clock">--:--:--</span><small>LOCAL</small>
+          </p>
+        </div>
+
+        <div class="legend" aria-hidden="true">
+          <span>TIME</span><span>SERVICE</span><span>DESTINATION</span
+          ><span>GATE</span><span>STATUS</span>
+        </div>
+        <sfe-board
+          id="departure-board"
+          announce
+          aria-label="Fictional departure board"
+        ></sfe-board>
+
+        <div class="controls" aria-label="Demo controls">
+          <button type="button" id="play">Play sequence</button>
+          <button type="button" id="pause">Pause</button>
+          <button type="button" id="previous" aria-label="Previous frame">
+            ←
+          </button>
+          <button type="button" id="next" aria-label="Next frame">→</button>
+          <label
+            >Settle
+            <select id="order">
+              <option value="forward">Forward</option>
+              <option value="reverse">Reverse</option>
+              <option value="center-out">Center out</option>
+              <option value="edges-in">Edges in</option>
+              <option value="simultaneous">Together</option>
+            </select>
+          </label>
+          <label
+            >Tempo
+            <input
+              id="tempo"
+              type="range"
+              min="240"
+              max="1400"
+              step="20"
+              value="720"
+            />
+          </label>
+          <label class="switch"
+            ><input id="loop" type="checkbox" checked /> Loop</label
+          >
+          <button type="button" id="theme">Light panel</button>
+        </div>
+      </section>
+
+      <section class="intro" aria-labelledby="intro-heading">
+        <p class="index">01 / FORMAT</p>
+        <div>
+          <h2 id="intro-heading">One board.<br />Any reel.</h2>
+          <p>
+            Letters, numbers, words, symbols, and emoji share the same small
+            API. Bring your own sequence; style every surface without reaching
+            through the component.
+          </p>
+          <pre><code>&lt;sfe-board id="board" loop&gt;
+  &lt;sfe-cell name="gate" preset="alpha"&gt;&lt;/sfe-cell&gt;
+  &lt;sfe-cell name="status" span="5"&gt;&lt;/sfe-cell&gt;
+&lt;/sfe-board&gt;
+
+&lt;script type="module"&gt;
+  import 'split-flap-elements';
+  board.sequence = [
+    { values: { gate: 'A', status: 'BOARDING' } }
+  ];
+  board.play();
+&lt;/script&gt;</code></pre>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>MIT licensed</span>
+      <a href="https://github.com/gabeosx/split-flap-elements"
+        >Source on GitHub ↗</a
+      >
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,7 @@
+dist
+site
+coverage
+playwright-report
+test-results
+assets/demo.gif
+package-lock.json

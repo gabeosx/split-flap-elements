@@ -1,0 +1,9 @@
+node_modules/
+dist/
+site/
+coverage/
+playwright-report/
+test-results/
+*.tgz
+*.sha256
+.DS_Store
