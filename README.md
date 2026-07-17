@@ -7,7 +7,12 @@ Configurable, accessible split-flap displays built with Web Components. Use lett
 
 [![Fictional departure board demonstrating split-flap-elements](./assets/demo.gif)](https://gabeosx.github.io/split-flap-elements/)
 
-**[Open the interactive demo](https://gabeosx.github.io/split-flap-elements/)**
+**[Open the interactive demo](https://gabeosx.github.io/split-flap-elements/)** ·
+**[Explore presets and build a board](https://gabeosx.github.io/split-flap-elements/playground/)**
+
+The playground includes live samples for every built-in preset plus custom word
+and emoji reels. Its visual builder turns frames, timing, settle order, looping,
+and panel choices into a working preview and copyable HTML.
 
 ## Install
 

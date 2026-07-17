@@ -52,7 +52,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "prepare": "npm run build",
-    "dev": "vite demo --host 127.0.0.1",
+    "dev": "npm run demo:build && vite site --host 127.0.0.1",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
