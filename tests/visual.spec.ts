@@ -8,7 +8,7 @@ test("departure board dark and light panels", async ({ page }, testInfo) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   await page.setViewportSize({ width: 1280, height: 900 });
-  await expect(page.locator(".console")).toHaveScreenshot(
+  await expect(page.locator("sfe-board")).toHaveScreenshot(
     "departure-dark.png",
     {
       animations: "disabled",
