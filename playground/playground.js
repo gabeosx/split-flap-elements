@@ -66,6 +66,7 @@ const presetInput = document.querySelector("#builder-preset");
 const reelInput = document.querySelector("#builder-reel");
 const framesInput = document.querySelector("#builder-frames");
 const orderInput = document.querySelector("#builder-order");
+const startInput = document.querySelector("#builder-start");
 const spinInput = document.querySelector("#builder-spin");
 const holdInput = document.querySelector("#builder-hold");
 const staggerInput = document.querySelector("#builder-stagger");
@@ -157,9 +158,10 @@ function setupSample(sample) {
   const fill = isCustom ? sample.reel[0] : " ";
   for (let index = 0; index < cellCount; index += 1) {
     const target = tokenFrames[0][index] ?? fill;
-    const restingValue = isCustom
-      ? (sample.reel.find((value) => value !== target) ?? target)
-      : " ";
+    const reel = sample.reel ?? REEL_PRESETS[sample.id];
+    const alternatives = reel.filter((value) => value !== target);
+    const restingValue =
+      alternatives[Math.floor(Math.random() * alternatives.length)] ?? target;
     sampleBoard.append(
       createCell(`cell-${index}`, {
         preset: isCustom ? undefined : sample.id,
@@ -247,7 +249,11 @@ function codeFor(configuration, sequence) {
     stagger: frame.stagger,
     timing: frame.timing,
   }));
-  return `<sfe-board id="board"${loop}>\n${cells}\n</sfe-board>\n\n<script type="module">\n  import "split-flap-elements";\n\n  const board = document.querySelector("#board");${customSetup}\n  board.sequence = ${JSON.stringify(printableSequence, null, 2)};\n  board.play();\n</script>`;
+  const startingPosition =
+    startInput.value === "random"
+      ? `const choices = cell.reel.filter((value) => value !== target);\n    if (choices.length > 0) {\n      cell.value = choices[Math.floor(Math.random() * choices.length)];\n    }`
+      : `const choices = cell.reel.filter((value) => value !== target);\n    if (cell.reel.includes(" ")) cell.value = " ";\n    else if (choices.length > 0) cell.value = choices[0];`;
+  return `<sfe-board id="board"${loop}>\n${cells}\n</sfe-board>\n\n<script type="module">\n  import "split-flap-elements";\n\n  const board = document.querySelector("#board");${customSetup}\n  const sequence = ${JSON.stringify(printableSequence, null, 2)};\n  board.sequence = sequence;\n\n  const firstFrame = sequence[0].values;\n  for (const cell of board.cells) {\n    const target = firstFrame[cell.name];\n    ${startingPosition}\n  }\n\n  board.play();\n</script>`;
 }
 
 function showStatus(message, isError = false) {
@@ -256,11 +262,16 @@ function showStatus(message, isError = false) {
 }
 
 function restingValueFor(configuration, index) {
-  if (!configuration.reel) return " ";
   const target = configuration.frames[0][index] ?? configuration.fill;
-  return (
-    configuration.reel.find((value) => value !== target) ?? configuration.fill
-  );
+  const reel = configuration.reel ?? REEL_PRESETS[configuration.preset];
+  const alternatives = reel.filter((value) => value !== target);
+  if (startInput.value === "random") {
+    return (
+      alternatives[Math.floor(Math.random() * alternatives.length)] ?? target
+    );
+  }
+  if (reel.includes(" ")) return " ";
+  return alternatives[0] ?? target;
 }
 
 function replayBuilder() {

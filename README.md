@@ -115,6 +115,23 @@ Settle orders:
 - `edges-in`
 - A custom array of cell indexes. Nested arrays settle as one group; omitted cells are appended in document order.
 
+All targeted cells begin spinning together. The settle order controls when each
+cell stops, and `stagger` sets the minimum delay between stop groups. With
+`simultaneous`, every cell starts and stops together.
+
+Set initial positions before playback when you want each reel to enter from a
+different point:
+
+```js
+const firstFrame = board.sequence[0].values;
+for (const cell of board.cells) {
+  const choices = cell.reel.filter((value) => value !== firstFrame[cell.name]);
+  if (choices.length > 0) {
+    cell.value = choices[Math.floor(Math.random() * choices.length)];
+  }
+}
+```
+
 Playback methods are `play()`, `pause()`, `resume()`, `stop()`, `replay()`, `next()`, `previous()`, and `seek(index)`.
 
 ## Events

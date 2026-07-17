@@ -59,15 +59,30 @@ test("a single phrase animates from blanks and replays", async ({ page }) => {
   await page.goto("/playground/");
   await page.locator("#builder-board").evaluate((element) => {
     (window as any).builderFlipCount = 0;
+    (window as any).builderEvents = [];
     element.addEventListener("sfe-flip", () => {
       (window as any).builderFlipCount += 1;
+    });
+    element.addEventListener("sfe-flip-start", (event: any) => {
+      (window as any).builderEvents.push({
+        type: "start",
+        previousValue: event.detail.previousValue,
+        target: event.detail.value,
+      });
+    });
+    element.addEventListener("sfe-settle", () => {
+      (window as any).builderEvents.push({ type: "settle" });
     });
   });
 
   await page.locator("#builder-preset").selectOption("alpha");
+  await expect(page.locator("#builder-start")).toHaveValue("random");
   await page.locator("#builder-spin").fill("160");
   await page.locator("#builder-frames").fill("NEW YORK");
-  await page.evaluate(() => ((window as any).builderFlipCount = 0));
+  await page.evaluate(() => {
+    (window as any).builderFlipCount = 0;
+    (window as any).builderEvents = [];
+  });
 
   await expect(page.locator("#builder-board sfe-cell")).toHaveCount(8);
   await expect
@@ -82,6 +97,16 @@ test("a single phrase animates from blanks and replays", async ({ page }) => {
         ),
     )
     .toBe("NEW YORK");
+  const events = await page.evaluate(() => (window as any).builderEvents);
+  const lastStart = events.map((event: any) => event.type).lastIndexOf("start");
+  const firstSettle = events.findIndex((event: any) => event.type === "settle");
+  expect(events.filter((event: any) => event.type === "start")).toHaveLength(8);
+  expect(lastStart).toBeLessThan(firstSettle);
+  expect(
+    events
+      .filter((event: any) => event.type === "start")
+      .every((event: any) => event.previousValue !== event.target),
+  ).toBe(true);
   const flipsAfterFirstPlay = await page.evaluate(
     () => (window as any).builderFlipCount,
   );
@@ -92,6 +117,9 @@ test("a single phrase animates from blanks and replays", async ({ page }) => {
     .toBeGreaterThan(flipsAfterFirstPlay);
   await expect(page.locator("#builder-status")).toContainText(
     "Replay resets and spins it again",
+  );
+  await expect(page.locator("#generated-code")).toContainText(
+    "Math.floor(Math.random() * choices.length)",
   );
 });
 

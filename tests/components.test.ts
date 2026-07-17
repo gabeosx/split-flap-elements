@@ -130,6 +130,80 @@ describe("sfe-board", () => {
     expect(order[2]).toBe("first");
   });
 
+  it("starts every cell before the first ordered settle", async () => {
+    const board = createBoard();
+    board.sequence = [
+      {
+        values: { first: "B", second: "B", third: "B" },
+        settleOrder: "forward",
+        stagger: 20,
+        timing: { spinDuration: 40, flipDuration: 10 },
+      },
+    ];
+    const events: string[] = [];
+    board.addEventListener("sfe-flip-start", (event) =>
+      events.push(`start:${(event as CustomEvent).detail.name}`),
+    );
+    board.addEventListener("sfe-settle", (event) =>
+      events.push(`settle:${(event as CustomEvent).detail.name}`),
+    );
+
+    await board.seek(0);
+
+    expect(events.slice(0, 3)).toEqual([
+      "start:first",
+      "start:second",
+      "start:third",
+    ]);
+    expect(events.slice(3)).toEqual([
+      "settle:first",
+      "settle:second",
+      "settle:third",
+    ]);
+  });
+
+  it("uses stagger as a minimum gap between stop groups", async () => {
+    const board = createBoard();
+    const durations: Record<string, number | undefined> = {};
+    for (const cell of board.cells) {
+      vi.spyOn(cell, "spinTo").mockImplementation(async (_target, options) => {
+        durations[cell.name] = options?.spinDuration;
+        return true;
+      });
+    }
+    board.sequence = [
+      {
+        values: { first: "B", second: "B", third: "B" },
+        settleOrder: "forward",
+        stagger: 30,
+        timing: {
+          first: { spinDuration: 100 },
+          second: { spinDuration: 20 },
+          third: { spinDuration: 60 },
+        },
+      },
+    ];
+
+    await board.seek(0);
+
+    expect(durations).toEqual({ first: 100, second: 130, third: 160 });
+
+    Object.keys(durations).forEach((name) => delete durations[name]);
+    board.sequence = [
+      {
+        values: { first: "B", second: "B", third: "B" },
+        settleOrder: "simultaneous",
+        timing: {
+          first: { spinDuration: 100 },
+          second: { spinDuration: 20 },
+          third: { spinDuration: 60 },
+        },
+      },
+    ];
+    await board.seek(0);
+    expect(durations).toEqual({ first: 100, second: 100, third: 100 });
+  });
+
   it("moves through frames with seek, next, and previous", async () => {
     const board = createBoard();
     board.sequence = [
