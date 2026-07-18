@@ -58,17 +58,51 @@ export function planSpin(
       ? (targetIndex - currentIndex + reel.length) % reel.length
       : (currentIndex - targetIndex + reel.length) % reel.length;
   const physicalDistance = distance === 0 ? reel.length : distance;
-  const steps = Math.max(physicalDistance, minimumSteps);
+  const minimumCadence = Math.max(16, stepDuration * 0.6);
+  const maximumCadence = Math.max(minimumCadence, stepDuration * 1.4);
+  const maximumCycles =
+    Math.ceil(minimumDuration / (minimumCadence * reel.length)) + 2;
+  let selected:
+    { steps: number; stepDuration: number; totalDuration: number } | undefined;
 
-  const path = Array.from({ length: steps }, (_, index) => {
+  for (let cycles = 0; cycles <= maximumCycles; cycles += 1) {
+    const steps = physicalDistance + cycles * reel.length;
+    const earliest = steps * minimumCadence;
+    const latest = steps * maximumCadence;
+    if (latest < minimumDuration) continue;
+    const totalDuration = Math.max(minimumDuration, earliest);
+    if (totalDuration > latest) continue;
+    const candidate = {
+      steps,
+      stepDuration: totalDuration / steps,
+      totalDuration,
+    };
+    if (
+      !selected ||
+      candidate.totalDuration < selected.totalDuration ||
+      (candidate.totalDuration === selected.totalDuration &&
+        Math.abs(candidate.stepDuration - stepDuration) <
+          Math.abs(selected.stepDuration - stepDuration))
+    ) {
+      selected = candidate;
+    }
+  }
+
+  const plan = selected ?? {
+    steps: physicalDistance,
+    stepDuration,
+    totalDuration: physicalDistance * stepDuration,
+  };
+
+  const path = Array.from({ length: plan.steps }, (_, index) => {
     const reelIndex =
-      (targetIndex - direction * (steps - index - 1) + reel.length * steps) %
+      (currentIndex + direction * (index + 1) + reel.length * plan.steps) %
       reel.length;
     return reel[reelIndex]!;
   });
   return {
     path,
-    stepDuration,
-    totalDuration: path.length * stepDuration,
+    stepDuration: plan.stepDuration,
+    totalDuration: plan.totalDuration,
   };
 }

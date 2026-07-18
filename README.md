@@ -105,13 +105,13 @@ Targets absent from a cell's reel are rejected with `sfe-config-error` and do no
 | `reel`               | `reel`              | alpha reel       | JSON attribute or `string[]` property |
 | `value`              | `value`             | random reel item | Current/initial value                 |
 | `span`               | `span`              | `1`              | Grid-column span                      |
-| `flip-duration`      | `flipDuration`      | `140` ms         | Per-flap cadence                      |
+| `flip-duration`      | `flipDuration`      | `140` ms         | Preferred per-flap cadence            |
 | `spin-duration`      | `spinDuration`      | `1400` ms        | Minimum spin window                   |
 | `intermediate-order` | `intermediateOrder` | `forward`        | `forward`, `reverse`, or `random`     |
 
 `spinTo(target, options?)` returns `Promise<boolean>`. It resolves `false` when cancelled, aborted, or invalid. `cancel()`, `pause()`, and `resume()` control an active cell spin; boards call them automatically.
 
-The default motion advances through reel values at a readable mechanical cadence. Cells spin concurrently, and longer paths naturally show more flaps. Set `spinDuration: 0` for an immediate settle.
+The default motion advances through adjacent reel values at a readable mechanical cadence. To preserve reel order and coordinated settling, the board may tune the preferred cadence within a restrained range or add a complete revolution. Cells spin concurrently, and longer paths naturally show more flaps. Set `spinDuration: 0` for an immediate settle.
 
 ## Sequences and boards
 

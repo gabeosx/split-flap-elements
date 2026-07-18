@@ -51,7 +51,8 @@
               "name": "flipDuration",
               "type": { "text": "number" },
               "attribute": "flip-duration",
-              "default": "140"
+              "default": "140",
+              "description": "Preferred per-flap cadence in milliseconds."
             },
             {
               "kind": "field",

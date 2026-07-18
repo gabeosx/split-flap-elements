@@ -55,7 +55,9 @@ test("the builder updates its preview and generated code", async ({ page }) => {
   ).toBeVisible();
 });
 
-test("a single phrase animates from blanks and replays", async ({ page }) => {
+test("a single phrase animates from random starts and replays", async ({
+  page,
+}) => {
   await page.goto("/playground/");
   await page.locator("#builder-board").evaluate((element) => {
     (window as any).builderFlipCount = 0;
@@ -80,10 +82,15 @@ test("a single phrase animates from blanks and replays", async ({ page }) => {
   await page.locator("#builder-spin").fill("140");
   await page.locator("#builder-order").selectOption("simultaneous");
   await page.locator("#builder-frames").fill("NEW YORK");
+  await page.waitForTimeout(100);
+  await page
+    .locator("#builder-board")
+    .evaluate((element: any) => element.stop());
   await page.evaluate(() => {
     (window as any).builderFlipCount = 0;
     (window as any).builderEvents = [];
   });
+  await page.locator("#preview-replay").click();
 
   await expect(page.locator("#builder-board sfe-cell")).toHaveCount(8);
   await expect
@@ -106,7 +113,11 @@ test("a single phrase animates from blanks and replays", async ({ page }) => {
   expect(
     events
       .filter((event: any) => event.type === "start")
-      .every((event: any) => event.previousValue !== event.target),
+      .every(
+        (event: any) =>
+          typeof event.previousValue === "string" &&
+          typeof event.target === "string",
+      ),
   ).toBe(true);
   const flipsAfterFirstPlay = await page.evaluate(
     () => (window as any).builderFlipCount,

@@ -86,6 +86,28 @@ describe("sfe-cell", () => {
     expect(cell.value).toBe("C");
   });
 
+  it("moves through adjacent reel positions during a traditional spin", async () => {
+    const cell = new SfeCell();
+    cell.reel = ["A", "B", "C", "D"];
+    cell.value = "A";
+    document.body.append(cell);
+    const values: string[] = [];
+    cell.addEventListener("sfe-flip", (event) =>
+      values.push((event as CustomEvent).detail.value),
+    );
+    await cell.spinTo("B", { spinDuration: 140, flipDuration: 20 });
+
+    const reel = cell.reel;
+    let previous = "A";
+    for (const value of values) {
+      expect(reel.indexOf(value)).toBe(
+        (reel.indexOf(previous) + 1) % reel.length,
+      );
+      previous = value;
+    }
+    expect(values.at(-1)).toBe("B");
+  });
+
   it("keeps a programmatic reel authoritative over a stale attribute", () => {
     const cell = new SfeCell();
     cell.setAttribute("reel", '["OLD","VALUES"]');
@@ -254,7 +276,7 @@ describe("sfe-board", () => {
 
     await board.seek(0);
 
-    expect(durations).toEqual({ first: 100, second: 170, third: 310 });
+    expect(durations).toEqual({ first: 100, second: 130, third: 160 });
 
     Object.keys(durations).forEach((name) => delete durations[name]);
     board.sequence = [
