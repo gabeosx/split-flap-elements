@@ -82,6 +82,42 @@ execFileSync(
   { cwd: root, stdio: "pipe" },
 );
 await writeFile(
+  join(fixture, "smoke.ts"),
+  `import "split-flap-elements";
+import { SfeBoard } from "split-flap-elements/board";
+import { SfeCell } from "split-flap-elements/cell";
+import { reelForPreset } from "split-flap-elements/presets";
+import type { SequenceFrame } from "split-flap-elements";
+
+const board: SfeBoard = document.createElement("sfe-board");
+const cell: SfeCell = document.createElement("sfe-cell");
+cell.reel = reelForPreset("alpha");
+cell.value = "A";
+board.append(cell);
+const frames: SequenceFrame[] = [{ values: { letter: "B" } }];
+board.sequence = frames;
+void board.play();
+`,
+);
+await writeFile(
+  join(fixture, "tsconfig.json"),
+  JSON.stringify({
+    compilerOptions: {
+      target: "ES2022",
+      module: "NodeNext",
+      moduleResolution: "NodeNext",
+      lib: ["DOM", "ES2022"],
+      strict: true,
+      noEmit: true,
+    },
+    include: ["smoke.ts"],
+  }),
+);
+execFileSync(join(root, "node_modules", ".bin", "tsc"), ["-p", fixture], {
+  cwd: fixture,
+  stdio: "pipe",
+});
+await writeFile(
   join(fixture, "index.html"),
   `<!doctype html><sfe-board id="board"><sfe-cell name="letter" preset="alpha" value="A"></sfe-cell></sfe-board><script type="module" src="/smoke.js"></script>`,
 );
