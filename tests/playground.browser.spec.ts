@@ -39,6 +39,25 @@ test("the builder updates its preview and generated code", async ({ page }) => {
   await expect(page.locator("#generated-code")).toContainText(
     '"settleOrder": "center-out"',
   );
+  await expect(page.locator("#generated-code")).toContainText(
+    'import "split-flap-elements"',
+  );
+
+  await page.locator("#builder-import").selectOption("cdn");
+  await expect(page.locator("#generated-code")).toContainText(
+    "https://esm.sh/split-flap-elements@",
+  );
+  await expect(page.locator("#generated-code")).not.toContainText(
+    "__SFE_VERSION__",
+  );
+  await page.locator("#builder-import").evaluate((element) => {
+    const select = element as HTMLSelectElement;
+    select.value = "bundler";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await expect(page.locator("#generated-code")).toContainText(
+    'import "split-flap-elements"',
+  );
 
   await page.locator("#builder-theme").selectOption("signal");
   await expect(page.locator("#preview-panel")).toHaveClass(/theme-signal/);

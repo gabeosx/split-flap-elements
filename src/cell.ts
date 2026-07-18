@@ -14,7 +14,10 @@ const cellStyles = String.raw`
     font-size: var(--sfe-font-size, 1rem);
     line-height: 1;
     perspective: 8em;
-    width: var(--sfe-cell-width, 1.9em);
+    width: calc(
+      var(--sfe-cell-width, 1.9em) * var(--sfe-span, 1) +
+      var(--sfe-board-gap, 0.12rem) * (var(--sfe-span, 1) - 1)
+    );
     height: var(--sfe-cell-height, 2.5em);
   }
 
@@ -89,7 +92,7 @@ function asPositiveNumber(value: string | null, fallback: number): number {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
-function isPreset(value: string | null): value is ReelPreset {
+function isPreset(value: unknown): value is ReelPreset {
   return (
     value === "alpha" ||
     value === "numeric" ||
@@ -98,8 +101,12 @@ function isPreset(value: string | null): value is ReelPreset {
   );
 }
 
-function isOrder(value: string | null): value is IntermediateOrder {
+function isOrder(value: unknown): value is IntermediateOrder {
   return value === "forward" || value === "reverse" || value === "random";
+}
+
+function isNonNegativeNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
 export class SfeCell extends HTMLElement {
@@ -119,6 +126,7 @@ export class SfeCell extends HTMLElement {
   #token = 0;
   #initialized = false;
   #paused = false;
+  #lastAutomaticLabel: string | null = null;
   #cell: HTMLElement;
   #top: HTMLElement;
   #bottom: HTMLElement;
@@ -128,7 +136,7 @@ export class SfeCell extends HTMLElement {
   constructor() {
     super();
     const root = this.attachShadow({ mode: "open" });
-    root.innerHTML = `<style>${cellStyles}</style><div class="cell" part="cell"><div class="half top" part="top"><span class="value"></span></div><div class="half bottom" part="bottom"><span class="value"></span></div><div class="half top moving" part="moving-top"><span class="value"></span></div><div class="half bottom moving" part="moving-bottom"><span class="value"></span></div><span class="split" part="split-line"></span></div>`;
+    root.innerHTML = `<style>${cellStyles}</style><div class="cell" part="cell" aria-hidden="true"><div class="half top" part="top"><span class="value"></span></div><div class="half bottom" part="bottom"><span class="value"></span></div><div class="half top moving" part="moving-top"><span class="value"></span></div><div class="half bottom moving" part="moving-bottom"><span class="value"></span></div><span class="split" part="split-line"></span></div>`;
     this.#cell = root.querySelector(".cell")!;
     this.#top = root.querySelector(".top:not(.moving) .value")!;
     this.#bottom = root.querySelector(".bottom:not(.moving) .value")!;
@@ -137,6 +145,8 @@ export class SfeCell extends HTMLElement {
   }
 
   connectedCallback(): void {
+    for (const name of SfeCell.observedAttributes)
+      this.#validateAttribute(name);
     this.#syncFromAttributes();
     if (!this.#initialized && !this.hasAttribute("value")) {
       this.#value =
@@ -149,6 +159,7 @@ export class SfeCell extends HTMLElement {
 
   attributeChangedCallback(name: string): void {
     if (!this.isConnected) return;
+    this.#validateAttribute(name);
     if (name === "reel" || (name === "preset" && !this.hasAttribute("reel"))) {
       this.#customReel = false;
     }
@@ -182,7 +193,14 @@ export class SfeCell extends HTMLElement {
     return [...this.#reel];
   }
   set reel(value: readonly string[]) {
-    const normalized = [...new Set(value.map(String))];
+    if (
+      !Array.isArray(value) ||
+      value.some((item) => typeof item !== "string")
+    ) {
+      this.#configurationError("A cell reel must be an array of strings.");
+      return;
+    }
+    const normalized = [...new Set(value)];
     if (normalized.length === 0) {
       this.#configurationError("A cell reel must contain at least one value.");
       return;
@@ -203,6 +221,10 @@ export class SfeCell extends HTMLElement {
     return isPreset(value) ? value : "alpha";
   }
   set preset(value: ReelPreset) {
+    if (!isPreset(value)) {
+      this.#configurationError(`Unknown reel preset “${String(value)}”.`);
+      return;
+    }
     this.#customReel = false;
     this.#reel = reelForPreset(value);
     if (!this.#reel.includes(this.#value)) this.#value = this.#reel[0]!;
@@ -235,13 +257,55 @@ export class SfeCell extends HTMLElement {
     this.setAttribute("intermediate-order", value);
   }
   get span(): number {
-    return Math.max(1, asPositiveNumber(this.getAttribute("span"), 1));
+    return Math.max(
+      1,
+      Math.floor(asPositiveNumber(this.getAttribute("span"), 1)),
+    );
   }
   set span(value: number) {
     this.setAttribute("span", String(value));
   }
 
   async spinTo(target: string, options: SpinOptions = {}): Promise<boolean> {
+    if (!options || typeof options !== "object" || Array.isArray(options)) {
+      this.#configurationError("Spin options must be an object.");
+      return false;
+    }
+    for (const [name, value] of [
+      ["spinDuration", options.spinDuration],
+      ["flipDuration", options.flipDuration],
+    ] as const) {
+      if (value !== undefined && !isNonNegativeNumber(value)) {
+        this.#configurationError(
+          `${name} must be a non-negative finite number.`,
+        );
+        return false;
+      }
+    }
+    if (
+      options.intermediateOrder !== undefined &&
+      !isOrder(options.intermediateOrder)
+    ) {
+      this.#configurationError(
+        "intermediateOrder must be forward, reverse, or random.",
+      );
+      return false;
+    }
+    const signal = options.signal;
+    if (
+      signal !== undefined &&
+      (typeof signal !== "object" ||
+        typeof signal.aborted !== "boolean" ||
+        typeof signal.addEventListener !== "function" ||
+        typeof signal.removeEventListener !== "function")
+    ) {
+      this.#configurationError("signal must be an AbortSignal.");
+      return false;
+    }
+    if (typeof target !== "string") {
+      this.#configurationError("A spin target must be a string.");
+      return false;
+    }
     if (!this.#reel.includes(target)) {
       this.#configurationError(
         `Value “${target}” is not present in this cell's reel.`,
@@ -286,11 +350,11 @@ export class SfeCell extends HTMLElement {
     );
 
     for (const next of path) {
-      if (runToken !== this.#token || options.signal?.aborted) return false;
-      await this.#flipStep(next, stepDuration, runToken, options.signal);
+      if (runToken !== this.#token || signal?.aborted) return false;
+      await this.#flipStep(next, stepDuration, runToken, signal);
     }
 
-    if (runToken !== this.#token || options.signal?.aborted) return false;
+    if (runToken !== this.#token || signal?.aborted) return false;
     this.#settle(target, previousValue);
     return true;
   }
@@ -348,6 +412,36 @@ export class SfeCell extends HTMLElement {
     }
     this.style.setProperty("--sfe-span", String(this.span));
     this.style.gridColumn = `span ${this.span}`;
+  }
+
+  #validateAttribute(name: string): void {
+    const value = this.getAttribute(name);
+    if (value === null) return;
+    if (name === "preset" && !isPreset(value)) {
+      this.#configurationError(`Unknown reel preset “${value}”.`);
+      return;
+    }
+    if (name === "intermediate-order" && !isOrder(value)) {
+      this.#configurationError(
+        "intermediate-order must be forward, reverse, or random.",
+      );
+      return;
+    }
+    if (name === "flip-duration" || name === "spin-duration") {
+      const number = Number(value);
+      if (!isNonNegativeNumber(number)) {
+        this.#configurationError(
+          `${name} must be a non-negative finite number.`,
+        );
+      }
+      return;
+    }
+    if (name === "span") {
+      const number = Number(value);
+      if (!Number.isInteger(number) || number < 1) {
+        this.#configurationError("span must be a positive integer.");
+      }
+    }
   }
 
   #flipStep(
@@ -418,6 +512,15 @@ export class SfeCell extends HTMLElement {
     this.#bottom.textContent = current;
     this.#movingTop.textContent = current;
     this.#movingBottom.textContent = next;
+    const existingLabel = this.getAttribute("aria-label");
+    if (existingLabel === null || existingLabel === this.#lastAutomaticLabel) {
+      const label = current.trim() === "" ? "blank" : current;
+      this.setAttribute("aria-label", label);
+      this.#lastAutomaticLabel = label;
+    } else {
+      this.#lastAutomaticLabel = null;
+    }
+    if (!this.hasAttribute("role")) this.setAttribute("role", "img");
   }
 
   #configurationError(message: string): void {

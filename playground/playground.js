@@ -72,11 +72,15 @@ const holdInput = document.querySelector("#builder-hold");
 const staggerInput = document.querySelector("#builder-stagger");
 const loopInput = document.querySelector("#builder-loop");
 const themeInput = document.querySelector("#builder-theme");
+const importInput = document.querySelector("#builder-import");
 const status = document.querySelector("#builder-status");
 const generatedCode = document.querySelector("#generated-code");
 const previewPanel = document.querySelector("#preview-panel");
 let builderPlayTimer;
+let builderRenderTimer;
 let activeBuilderConfiguration = null;
+let renderedFormSignature = "";
+let scheduledFormSignature = "";
 
 function splitGraphemes(value) {
   if (!segmenter) return Array.from(value);
@@ -247,7 +251,15 @@ function codeFor(configuration, sequence) {
     startInput.value === "random"
       ? "\n  // Cells choose random reel positions by default.\n"
       : `\n  for (const cell of board.cells) {\n    if (cell.reel.includes(" ")) cell.value = " ";\n    else cell.value = cell.reel[0];\n  }\n`;
-  return `<sfe-board id="board"${loop}>\n${cells}\n</sfe-board>\n\n<script type="module">\n  import "split-flap-elements";\n\n  const board = document.querySelector("#board");${customSetup}\n  const sequence = ${JSON.stringify(printableSequence, null, 2)};\n  board.sequence = sequence;${startingSetup}\n  board.play();\n</script>`;
+  const importSpecifier =
+    importInput.value === "cdn"
+      ? `https://esm.sh/split-flap-elements@__SFE_VERSION__`
+      : "split-flap-elements";
+  const importNote =
+    importInput.value === "cdn"
+      ? "\n  // This URL works after the selected package version is published to npm."
+      : "";
+  return `<sfe-board id="board"${loop}>\n${cells}\n</sfe-board>\n\n<script type="module">${importNote}\n  import "${importSpecifier}";\n\n  const board = document.querySelector("#board");${customSetup}\n  const sequence = ${JSON.stringify(printableSequence, null, 2)};\n  board.sequence = sequence;${startingSetup}\n  board.play();\n</script>`;
 }
 
 function showStatus(message, isError = false) {
@@ -282,6 +294,9 @@ function renderBuilder() {
   window.clearTimeout(builderPlayTimer);
   board.stop();
   board.replaceChildren();
+  renderedFormSignature = JSON.stringify(
+    Array.from(new FormData(form).entries()),
+  );
   try {
     const configuration = builderConfiguration();
     activeBuilderConfiguration = configuration;
@@ -342,12 +357,28 @@ function updateOutputs() {
 presetInput.addEventListener("change", () => {
   framesInput.value = BUILDER_DEFAULTS[presetInput.value];
   syncPresetFields();
-  renderBuilder();
 });
-form.addEventListener("input", () => {
+function scheduleBuilderRender() {
   updateOutputs();
-  renderBuilder();
-});
+  const signature = JSON.stringify(Array.from(new FormData(form).entries()));
+  if (
+    signature === renderedFormSignature ||
+    signature === scheduledFormSignature
+  )
+    return;
+  scheduledFormSignature = signature;
+  window.clearTimeout(builderPlayTimer);
+  window.clearTimeout(builderRenderTimer);
+  board.stop();
+  builderRenderTimer = window.setTimeout(() => {
+    builderRenderTimer = undefined;
+    scheduledFormSignature = "";
+    renderBuilder();
+  }, 0);
+}
+
+form.addEventListener("input", scheduleBuilderRender);
+form.addEventListener("change", scheduleBuilderRender);
 themeInput.addEventListener("change", () => {
   previewPanel.className = `preview-panel theme-${themeInput.value}`;
 });

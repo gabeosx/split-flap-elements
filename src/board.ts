@@ -334,9 +334,12 @@ export class SfeBoard extends HTMLElement {
     if (signal.aborted) return false;
     emit(this, "sfe-frame-settle", { frame: index });
     if (this.hasAttribute("announce")) {
-      const announcement = cells
-        .map((cell) => cell.value)
-        .join(" ")
+      const values = cells.map((cell) => cell.value);
+      const singleCharacterBoard = values.every(
+        (value) => Array.from(value).length <= 1,
+      );
+      const announcement = values
+        .join(singleCharacterBoard ? "" : " ")
         .replace(/\s+/g, " ")
         .trim();
       this.#live.textContent = announcement;
@@ -366,17 +369,26 @@ export class SfeBoard extends HTMLElement {
     if (order === "simultaneous") return [forward];
     if (order === "reverse") return forward.reverse().map((index) => [index]);
     if (order === "center-out") {
-      return forward
-        .sort(
-          (a, b) =>
-            Math.abs(a - (count - 1) / 2) - Math.abs(b - (count - 1) / 2),
-        )
-        .map((index) => [index]);
+      const groups: number[][] = [];
+      let left = Math.floor((count - 1) / 2);
+      let right = Math.ceil((count - 1) / 2);
+      while (left >= 0 && right < count) {
+        groups.push(left === right ? [left] : [left, right]);
+        left -= 1;
+        right += 1;
+      }
+      return groups;
     }
     if (order === "edges-in") {
-      return forward
-        .sort((a, b) => Math.min(a, count - 1 - a) - Math.min(b, count - 1 - b))
-        .map((index) => [index]);
+      const groups: number[][] = [];
+      let left = 0;
+      let right = count - 1;
+      while (left <= right) {
+        groups.push(left === right ? [left] : [left, right]);
+        left += 1;
+        right -= 1;
+      }
+      return groups;
     }
     return forward.map((index) => [index]);
   }

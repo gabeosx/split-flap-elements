@@ -47,6 +47,12 @@ test("the departure demo loads and plays", async ({ page }) => {
   const board = page.locator("sfe-board");
   await expect(board).toBeVisible();
   await expect(page.locator("sfe-cell")).toHaveCount(32);
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+    "content",
+    "https://gabeosx.github.io/split-flap-elements/assets/social-preview.png",
+  );
+  const socialPreview = await page.request.get("/assets/social-preview.png");
+  expect(socialPreview.ok()).toBe(true);
   await expect
     .poll(() => board.evaluate((element: any) => element.playbackState))
     .toBe("playing");
@@ -88,8 +94,38 @@ test("reduced motion settles without intermediate flips", async ({ page }) => {
 
 test("interactive controls have visible keyboard focus", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Play sequence" }).focus();
-  await expect(
-    page.getByRole("button", { name: "Play sequence" }),
-  ).toBeFocused();
+  await expect
+    .poll(() =>
+      page
+        .locator("sfe-board")
+        .evaluate((element: any) => element.playbackState),
+    )
+    .toBe("playing");
+  const pause = page.getByRole("button", { name: "Pause" });
+  await pause.focus();
+  await expect(pause).toBeFocused();
+  await pause.press("Enter");
+  await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
+});
+
+test("span changes a cell's default rendered width", async ({ page }) => {
+  await page.goto("/playground/");
+  const widths = await page.evaluate(() => {
+    const board = document.createElement("sfe-board");
+    board.style.setProperty("--sfe-cell-width", "40px");
+    board.style.setProperty("--sfe-board-gap", "4px");
+    const single = document.createElement("sfe-cell");
+    single.setAttribute("value", "A");
+    const triple = document.createElement("sfe-cell");
+    triple.setAttribute("value", "A");
+    triple.setAttribute("span", "3");
+    board.append(single, triple);
+    document.body.append(board);
+    return {
+      single: single.getBoundingClientRect().width,
+      triple: triple.getBoundingClientRect().width,
+    };
+  });
+  expect(widths.single).toBeCloseTo(40, 0);
+  expect(widths.triple).toBeCloseTo(128, 0);
 });

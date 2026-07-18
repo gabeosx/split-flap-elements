@@ -7,6 +7,31 @@
       name="description"
       content="Explore split-flap reel presets and build a working board without writing configuration by hand."
     />
+    <meta name="theme-color" content="#0c0d0e" />
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:title"
+      content="Preset gallery + builder — split-flap-elements"
+    />
+    <meta
+      property="og:description"
+      content="Explore every split-flap preset, configure a live board, and copy production-ready code."
+    />
+    <meta
+      property="og:url"
+      content="https://gabeosx.github.io/split-flap-elements/playground/"
+    />
+    <meta
+      property="og:image"
+      content="https://gabeosx.github.io/split-flap-elements/assets/social-preview.png"
+    />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="640" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link
+      rel="canonical"
+      href="https://gabeosx.github.io/split-flap-elements/playground/"
+    />
     <title>Preset gallery + builder — split-flap-elements</title>
     <link rel="stylesheet" href="./styles.css" />
     <script type="module" src="./playground.js"></script>
@@ -163,6 +188,13 @@ READY</textarea>
                   <option value="terminal">Terminal</option>
                   <option value="paper">Paper</option>
                   <option value="signal">Signal</option>
+                </select>
+              </label>
+              <label>
+                Import style
+                <select id="builder-import" name="import">
+                  <option value="bundler">NPM / bundler</option>
+                  <option value="cdn">Browser / CDN</option>
                 </select>
               </label>
               <label class="check-control">

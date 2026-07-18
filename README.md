@@ -5,7 +5,7 @@ Dependency-free, accessible split-flap displays built with Web Components. Use i
 [![CI](https://github.com/gabeosx/split-flap-elements/actions/workflows/ci.yml/badge.svg)](https://github.com/gabeosx/split-flap-elements/actions/workflows/ci.yml)
 [![MIT license](https://img.shields.io/badge/license-MIT-17191b.svg)](./LICENSE)
 
-[![Fictional departure board demonstrating split-flap-elements](./assets/demo.gif)](https://gabeosx.github.io/split-flap-elements/)
+[![Fictional departure board demonstrating split-flap-elements](https://raw.githubusercontent.com/gabeosx/split-flap-elements/main/assets/demo.gif)](https://gabeosx.github.io/split-flap-elements/)
 
 **[Open the live demo](https://gabeosx.github.io/split-flap-elements/)** · **[Try every preset and build a board](https://gabeosx.github.io/split-flap-elements/playground/)**
 
@@ -69,6 +69,8 @@ After npm publication, a no-build browser import can use an ESM CDN:
 
 Pin an exact package version in production. The primary entry point is browser-only because registration requires `HTMLElement` and `customElements`; client-only or deferred import is required in SSR applications. `split-flap-elements/presets` is DOM-free.
 
+The live builder's **Import style** control generates either the bare npm specifier for bundlers or a version-pinned ESM CDN URL for direct browser use.
+
 ## Reels and cells
 
 Built-in presets all include a blank space:
@@ -104,7 +106,7 @@ Targets absent from a cell's reel are rejected with `sfe-config-error` and do no
 | `preset`             | `preset`            | `alpha`          | Built-in reel                         |
 | `reel`               | `reel`              | alpha reel       | JSON attribute or `string[]` property |
 | `value`              | `value`             | random reel item | Current/initial value                 |
-| `span`               | `span`              | `1`              | Grid-column span                      |
+| `span`               | `span`              | `1`              | Relative cell width/grid-column span  |
 | `flip-duration`      | `flipDuration`      | `140` ms         | Preferred per-flap cadence            |
 | `spin-duration`      | `spinDuration`      | `1400` ms        | Minimum spin window                   |
 | `intermediate-order` | `intermediateOrder` | `forward`        | `forward`, `reverse`, or `random`     |
@@ -137,7 +139,7 @@ board.sequence = [
 
 Frame defaults are a `2400` ms hold, `forward` settle order, and `120` ms minimum gap between settle groups. `timing` may be one `CellTiming` object or a record keyed by cell name.
 
-Settle orders are `forward`, `reverse`, `simultaneous`, `center-out`, `edges-in`, or a custom array of cell indexes. Nested indexes form groups; omitted cells are appended in document order:
+Settle orders are `forward`, `reverse`, `simultaneous`, `center-out`, `edges-in`, or a custom array of cell indexes. Center-out and edges-in settle symmetric pairs together. Nested indexes form custom groups; omitted cells are appended in document order:
 
 ```js
 {
@@ -235,8 +237,9 @@ Parts are `board`, `grid`, `cell`, `top`, `bottom`, `moving-top`, `moving-bottom
 ## Accessibility and browser support
 
 - `prefers-reduced-motion: reduce` removes intermediate flips and settles directly.
+- Each cell exposes one accessible value; duplicated mechanical layers are hidden from assistive technology.
 - Intermediate reel values are not announced.
-- `announce` opts a board into an atomic polite live region after each settled frame.
+- `announce` opts a board into an atomic polite live region after each settled frame; adjacent single-character cells are announced as normal words.
 - Demo and builder controls use native keyboard controls and visible focus styles.
 - Current Chromium, Firefox, and WebKit are tested. The package requires Custom Elements, Shadow DOM, CSS custom properties, private class fields, and ES modules.
 

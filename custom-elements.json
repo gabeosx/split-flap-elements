@@ -44,7 +44,8 @@
               "name": "span",
               "type": { "text": "number" },
               "attribute": "span",
-              "default": "1"
+              "default": "1",
+              "description": "Positive integer width multiplier and grid-column span."
             },
             {
               "kind": "field",

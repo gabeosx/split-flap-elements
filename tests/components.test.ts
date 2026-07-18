@@ -47,6 +47,59 @@ describe("sfe-cell", () => {
     expect(cell.value).toBe("BOARDING");
   });
 
+  it("rejects malformed programmatic reels and spin options without throwing", async () => {
+    const cell = new SfeCell();
+    document.body.append(cell);
+    cell.reel = ["A", "B"];
+    cell.value = "A";
+    const errors: string[] = [];
+    cell.addEventListener("sfe-config-error", (event) =>
+      errors.push((event as CustomEvent).detail.message),
+    );
+
+    expect(() => {
+      cell.reel = null as any;
+    }).not.toThrow();
+    await expect(cell.spinTo("B", { spinDuration: Number.NaN })).resolves.toBe(
+      false,
+    );
+    await expect(cell.spinTo("B", null as any)).resolves.toBe(false);
+    await expect(cell.spinTo("B", { signal: {} as AbortSignal })).resolves.toBe(
+      false,
+    );
+
+    expect(cell.reel).toEqual(["A", "B"]);
+    expect(cell.value).toBe("A");
+    expect(errors).toEqual([
+      "A cell reel must be an array of strings.",
+      "spinDuration must be a non-negative finite number.",
+      "Spin options must be an object.",
+      "signal must be an AbortSignal.",
+    ]);
+    await expect(cell.spinTo("B", { spinDuration: 0 })).resolves.toBe(true);
+    expect(cell.value).toBe("B");
+  });
+
+  it("exposes one accessible value while hiding duplicated visual layers", () => {
+    const cell = new SfeCell();
+    cell.reel = ["A", "B"];
+    cell.value = "A";
+    document.body.append(cell);
+    expect(cell.getAttribute("role")).toBe("img");
+    expect(cell.getAttribute("aria-label")).toBe("A");
+    expect(
+      cell.shadowRoot
+        ?.querySelector('[part="cell"]')
+        ?.getAttribute("aria-hidden"),
+    ).toBe("true");
+
+    cell.value = "B";
+    expect(cell.getAttribute("aria-label")).toBe("B");
+    cell.setAttribute("aria-label", "Gate status");
+    cell.value = "A";
+    expect(cell.getAttribute("aria-label")).toBe("Gate status");
+  });
+
   it("reports a target that is not in the reel", async () => {
     const cell = new SfeCell();
     document.body.append(cell);
@@ -72,17 +125,47 @@ describe("sfe-cell", () => {
     expect(cell.value).not.toBe("C");
   });
 
+  it("reports malformed cell attributes and uses safe defaults", () => {
+    const cell = new SfeCell();
+    cell.setAttribute("preset", "alpah");
+    cell.setAttribute("spin-duration", "fast");
+    cell.setAttribute("span", "1.5");
+    cell.setAttribute("intermediate-order", "sideways");
+    const errors: string[] = [];
+    cell.addEventListener("sfe-config-error", (event) =>
+      errors.push((event as CustomEvent).detail.message),
+    );
+    document.body.append(cell);
+
+    expect(errors).toEqual([
+      "Unknown reel preset “alpah”.",
+      "span must be a positive integer.",
+      "spin-duration must be a non-negative finite number.",
+      "intermediate-order must be forward, reverse, or random.",
+    ]);
+    expect(cell.preset).toBe("alpha");
+    expect(cell.span).toBe(1);
+    expect(cell.spinDuration).toBe(1400);
+    expect(cell.intermediateOrder).toBe("forward");
+  });
+
   it("emits flip and settle boundaries in order", async () => {
     const cell = new SfeCell();
     document.body.append(cell);
     cell.reel = ["A", "B", "C"];
     cell.value = "A";
     const events: string[] = [];
-    cell.addEventListener("sfe-flip-start", () => events.push("start"));
+    let boundary: CustomEvent | undefined;
+    cell.addEventListener("sfe-flip-start", (event) => {
+      boundary = event as CustomEvent;
+      events.push("start");
+    });
     cell.addEventListener("sfe-flip", () => events.push("flip"));
     cell.addEventListener("sfe-settle", () => events.push("settle"));
     await cell.spinTo("C", { spinDuration: 20, flipDuration: 20 });
     expect(events).toEqual(["start", "flip", "flip", "settle"]);
+    expect(boundary?.bubbles).toBe(true);
+    expect(boundary?.composed).toBe(true);
     expect(cell.value).toBe("C");
   });
 
@@ -106,6 +189,32 @@ describe("sfe-cell", () => {
       previous = value;
     }
     expect(values.at(-1)).toBe("B");
+  });
+
+  it("preserves adjacent reel order when spinning in reverse", async () => {
+    const cell = new SfeCell();
+    cell.reel = ["A", "B", "C", "D"];
+    cell.value = "A";
+    document.body.append(cell);
+    const values: string[] = [];
+    cell.addEventListener("sfe-flip", (event) =>
+      values.push((event as CustomEvent).detail.value),
+    );
+    await cell.spinTo("D", {
+      spinDuration: 140,
+      flipDuration: 20,
+      intermediateOrder: "reverse",
+    });
+
+    const reel = cell.reel;
+    let previous = "A";
+    for (const value of values) {
+      expect(reel.indexOf(value)).toBe(
+        (reel.indexOf(previous) - 1 + reel.length) % reel.length,
+      );
+      previous = value;
+    }
+    expect(values.at(-1)).toBe("D");
   });
 
   it("keeps a programmatic reel authoritative over a stale attribute", () => {
@@ -252,6 +361,64 @@ describe("sfe-board", () => {
     ]);
   });
 
+  it("settles symmetric center-out and edges-in groups together", async () => {
+    const board = new SfeBoard();
+    for (const name of ["first", "second", "middle", "fourth", "fifth"]) {
+      const cell = new SfeCell();
+      cell.name = name;
+      cell.reel = ["A", "B"];
+      cell.value = "A";
+      board.append(cell);
+    }
+    document.body.append(board);
+
+    const durations: Record<string, number | undefined> = {};
+    for (const cell of board.cells) {
+      vi.spyOn(cell, "spinTo").mockImplementation(async (_target, options) => {
+        durations[cell.name] = options?.spinDuration;
+        return true;
+      });
+    }
+    const values = Object.fromEntries(
+      board.cells.map((cell) => [cell.name, "B"]),
+    );
+
+    board.sequence = [
+      {
+        values,
+        settleOrder: "center-out",
+        stagger: 30,
+        timing: { spinDuration: 100 },
+      },
+    ];
+    await board.seek(0);
+    expect(durations).toEqual({
+      first: 160,
+      second: 130,
+      middle: 100,
+      fourth: 130,
+      fifth: 160,
+    });
+
+    Object.keys(durations).forEach((name) => delete durations[name]);
+    board.sequence = [
+      {
+        values,
+        settleOrder: "edges-in",
+        stagger: 30,
+        timing: { spinDuration: 100 },
+      },
+    ];
+    await board.seek(0);
+    expect(durations).toEqual({
+      first: 100,
+      second: 130,
+      middle: 160,
+      fourth: 130,
+      fifth: 100,
+    });
+  });
+
   it("uses stagger as a minimum gap between stop groups", async () => {
     const board = createBoard();
     const durations: Record<string, number | undefined> = {};
@@ -305,6 +472,52 @@ describe("sfe-board", () => {
     expect(board.cells[0]?.value).toBe("B");
     await board.previous();
     expect(board.currentFrame).toBe(0);
+  });
+
+  it("emits playback, frame, flip, and settle boundaries in order", async () => {
+    const board = createBoard();
+    board.sequence = [
+      {
+        values: { first: "B" },
+        hold: 0,
+        timing: { spinDuration: 0 },
+      },
+    ];
+    const events: string[] = [];
+    let frameBoundary: CustomEvent | undefined;
+    board.addEventListener("sfe-playback-state", (event) =>
+      events.push(`state:${(event as CustomEvent).detail.state}`),
+    );
+    board.addEventListener("sfe-sequence-start", () =>
+      events.push("sequence:start"),
+    );
+    board.addEventListener("sfe-frame-start", (event) => {
+      frameBoundary = event as CustomEvent;
+      events.push("frame:start");
+    });
+    board.addEventListener("sfe-flip-start", () => events.push("cell:start"));
+    board.addEventListener("sfe-settle", () => events.push("cell:settle"));
+    board.addEventListener("sfe-frame-settle", () =>
+      events.push("frame:settle"),
+    );
+    board.addEventListener("sfe-sequence-end", () =>
+      events.push("sequence:end"),
+    );
+
+    await board.play();
+
+    expect(events).toEqual([
+      "state:playing",
+      "sequence:start",
+      "frame:start",
+      "cell:start",
+      "cell:settle",
+      "frame:settle",
+      "sequence:end",
+      "state:idle",
+    ]);
+    expect(frameBoundary?.bubbles).toBe(true);
+    expect(frameBoundary?.composed).toBe(true);
   });
 
   it("rejects malformed and unreachable frames without entering playback", async () => {
@@ -386,7 +599,7 @@ describe("sfe-board", () => {
     board.sequence = [{ values: { first: "B" }, timing: { spinDuration: 0 } }];
     await board.seek(0);
     const live = board.shadowRoot?.querySelector('[aria-live="polite"]');
-    expect(live?.textContent).toContain("B");
+    expect(live?.textContent).toBe("BAA");
   });
 
   it("loops until stopped", async () => {

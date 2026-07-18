@@ -23,6 +23,9 @@ try {
     Math.random = () => ((randomIndex++ % 17) + 0.5) / 18;
   });
   await page.goto("http://127.0.0.1:4174");
+  await page.waitForFunction(
+    () => document.querySelector("#clock")?.textContent !== "--:--:--",
+  );
   for (let index = 0; index < 120; index += 1) {
     await page.screenshot({
       path: `${frames}/frame-${String(index).padStart(3, "0")}.png`,
