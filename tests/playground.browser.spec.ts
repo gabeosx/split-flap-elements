@@ -77,7 +77,8 @@ test("a single phrase animates from blanks and replays", async ({ page }) => {
 
   await page.locator("#builder-preset").selectOption("alpha");
   await expect(page.locator("#builder-start")).toHaveValue("random");
-  await page.locator("#builder-spin").fill("160");
+  await page.locator("#builder-spin").fill("140");
+  await page.locator("#builder-order").selectOption("simultaneous");
   await page.locator("#builder-frames").fill("NEW YORK");
   await page.evaluate(() => {
     (window as any).builderFlipCount = 0;
@@ -119,7 +120,7 @@ test("a single phrase animates from blanks and replays", async ({ page }) => {
     "Replay resets and spins it again",
   );
   await expect(page.locator("#generated-code")).toContainText(
-    "Math.floor(Math.random() * choices.length)",
+    "Cells choose random reel positions by default",
   );
 });
 

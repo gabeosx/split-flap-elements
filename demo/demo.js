@@ -11,28 +11,23 @@ function addCell(name, options = {}) {
   cell.preset = options.preset ?? "alphanumeric";
   cell.span = options.span ?? 1;
   if (options.reel) cell.reel = options.reel;
-  cell.value = options.value ?? cell.reel[0];
+  if (options.value !== undefined) cell.value = options.value;
   board.append(cell);
 }
 
 for (let row = 0; row < 4; row += 1) {
   for (let index = 0; index < 4; index += 1)
-    addCell(`r${row}-time-${index}`, {
-      preset: "numeric",
-      value: index === 2 ? "3" : "1",
-    });
-  addCell(`r${row}-service`, { span: 3, reel: services, value: services[row] });
+    addCell(`r${row}-time-${index}`, { preset: "numeric" });
+  addCell(`r${row}-service`, { span: 3, reel: services });
   addCell(`r${row}-destination`, {
     span: 8,
     reel: destinations,
-    value: destinations[row],
   });
   addCell(`r${row}-gate`, {
     span: 2,
     reel: ["A1", "B4", "C7", "D2", "E8", "F3"],
-    value: ["A1", "B4", "C7", "D2"][row],
   });
-  addCell(`r${row}-status`, { span: 5, reel: wordReel, value: wordReel[row] });
+  addCell(`r${row}-status`, { span: 5, reel: wordReel });
   if (row < 3) {
     const divider = document.createElement("span");
     divider.className = "row-break";
@@ -62,7 +57,7 @@ const schedule = [
   ],
 ];
 
-function makeFrames(order = "forward", spinDuration = 720) {
+function makeFrames(order = "forward", spinDuration = 1400) {
   return schedule.map((rows) => {
     const values = {};
     rows.forEach(([time, service, destination, gate, status], row) => {
@@ -76,10 +71,10 @@ function makeFrames(order = "forward", spinDuration = 720) {
     });
     return {
       values,
-      hold: 1700,
+      hold: 2600,
       settleOrder: order,
-      stagger: 24,
-      timing: { spinDuration, flipDuration: 90 },
+      stagger: 120,
+      timing: { spinDuration },
     };
   });
 }
@@ -91,22 +86,7 @@ function updateSequence() {
   );
 }
 
-function randomizeStartingPositions() {
-  const firstFrame = board.sequence[0]?.values;
-  if (!firstFrame) return;
-
-  for (const cell of board.cells) {
-    const target = firstFrame[cell.name];
-    const alternatives = cell.reel.filter((value) => value !== target);
-    if (alternatives.length > 0) {
-      cell.value =
-        alternatives[Math.floor(Math.random() * alternatives.length)];
-    }
-  }
-}
-
 updateSequence();
-randomizeStartingPositions();
 board.loop = true;
 
 document.querySelector("#play").addEventListener("click", () => board.play());

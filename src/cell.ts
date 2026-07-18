@@ -1,4 +1,9 @@
 import { emit } from "./events.js";
+import {
+  DEFAULT_FLIP_DURATION,
+  DEFAULT_SPIN_DURATION,
+  planSpin,
+} from "./motion.js";
 import { reelForPreset } from "./presets.js";
 import type { IntermediateOrder, ReelPreset, SpinOptions } from "./types.js";
 
@@ -66,8 +71,9 @@ const cellStyles = String.raw`
 
   .moving { z-index: 3; transform-origin: center bottom; }
   .moving.bottom { transform-origin: center top; transform: rotateX(90deg); }
-  .cell.is-flipping .moving.top { animation: fold var(--sfe-step-duration, 60ms) ease-in forwards; }
-  .cell.is-flipping .moving.bottom { animation: unfold var(--sfe-step-duration, 60ms) ease-out var(--sfe-step-duration, 60ms) forwards; }
+  .cell.is-flipping .moving.top { animation: fold var(--sfe-step-duration, 70ms) cubic-bezier(.55, .06, .68, .19) forwards; }
+  .cell.is-flipping .moving.bottom { animation: unfold var(--sfe-step-duration, 70ms) cubic-bezier(.22, .61, .36, 1) var(--sfe-step-duration, 70ms) forwards; }
+  .cell.is-paused .moving { animation-play-state: paused; }
 
   @keyframes fold { to { transform: rotateX(-90deg); } }
   @keyframes unfold { to { transform: rotateX(0deg); } }
@@ -78,6 +84,7 @@ const cellStyles = String.raw`
 `;
 
 function asPositiveNumber(value: string | null, fallback: number): number {
+  if (value === null) return fallback;
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
@@ -110,6 +117,8 @@ export class SfeCell extends HTMLElement {
   #customReel = false;
   #value = " ";
   #token = 0;
+  #initialized = false;
+  #paused = false;
   #cell: HTMLElement;
   #top: HTMLElement;
   #bottom: HTMLElement;
@@ -129,6 +138,12 @@ export class SfeCell extends HTMLElement {
 
   connectedCallback(): void {
     this.#syncFromAttributes();
+    if (!this.#initialized && !this.hasAttribute("value")) {
+      this.#value =
+        this.#reel[Math.floor(Math.random() * this.#reel.length)] ??
+        this.#reel[0]!;
+    }
+    this.#initialized = true;
     this.#render(this.#value, this.#value);
   }
 
@@ -174,7 +189,12 @@ export class SfeCell extends HTMLElement {
     }
     this.#customReel = true;
     this.#reel = normalized;
-    if (!this.#reel.includes(this.#value)) this.#value = this.#reel[0]!;
+    if (!this.#reel.includes(this.#value)) {
+      this.#value =
+        this.#initialized && !this.hasAttribute("value")
+          ? this.#reel[Math.floor(Math.random() * this.#reel.length)]!
+          : this.#reel[0]!;
+    }
     this.#render(this.#value, this.#value);
   }
 
@@ -190,13 +210,19 @@ export class SfeCell extends HTMLElement {
   }
 
   get flipDuration(): number {
-    return asPositiveNumber(this.getAttribute("flip-duration"), 120);
+    return asPositiveNumber(
+      this.getAttribute("flip-duration"),
+      DEFAULT_FLIP_DURATION,
+    );
   }
   set flipDuration(value: number) {
     this.setAttribute("flip-duration", String(value));
   }
   get spinDuration(): number {
-    return asPositiveNumber(this.getAttribute("spin-duration"), 900);
+    return asPositiveNumber(
+      this.getAttribute("spin-duration"),
+      DEFAULT_SPIN_DURATION,
+    );
   }
   set spinDuration(value: number) {
     this.setAttribute("spin-duration", String(value));
@@ -241,22 +267,26 @@ export class SfeCell extends HTMLElement {
       value: target,
       previousValue,
     });
-    if (reduced || spinDuration === 0 || previousValue === target) {
+    if (reduced || spinDuration === 0) {
       this.#settle(target, previousValue);
       return true;
     }
 
-    const path = this.#pathTo(target, order);
-    const steps = Math.max(1, Math.floor(spinDuration / flipDuration));
-    const stepDuration = spinDuration / steps;
+    const { path, stepDuration } = planSpin(
+      this.#reel,
+      previousValue,
+      target,
+      order,
+      spinDuration,
+      flipDuration,
+    );
     this.style.setProperty(
       "--sfe-step-duration",
       `${Math.max(16, stepDuration / 2)}ms`,
     );
 
-    for (let index = 0; index < steps; index += 1) {
+    for (const next of path) {
       if (runToken !== this.#token || options.signal?.aborted) return false;
-      const next = index === steps - 1 ? target : path[index % path.length]!;
       await this.#flipStep(next, stepDuration, runToken, options.signal);
     }
 
@@ -267,12 +297,23 @@ export class SfeCell extends HTMLElement {
 
   cancel(): void {
     this.#token += 1;
-    this.#cell.classList.remove("is-flipping");
+    this.#paused = false;
+    this.#cell.classList.remove("is-flipping", "is-paused");
+  }
+
+  pause(): void {
+    this.#paused = true;
+    this.#cell.classList.add("is-paused");
+  }
+
+  resume(): void {
+    this.#paused = false;
+    this.#cell.classList.remove("is-paused");
   }
 
   #syncFromAttributes(): void {
     const reelAttribute = this.getAttribute("reel");
-    if (reelAttribute) {
+    if (reelAttribute && !this.#customReel) {
       try {
         const parsed: unknown = JSON.parse(reelAttribute);
         if (
@@ -309,18 +350,6 @@ export class SfeCell extends HTMLElement {
     this.style.gridColumn = `span ${this.span}`;
   }
 
-  #pathTo(target: string, order: IntermediateOrder): string[] {
-    const values = this.#reel.filter((item) => item !== target);
-    if (order === "reverse") return values.reverse();
-    if (order === "random") {
-      return values
-        .map((value) => ({ value, rank: Math.random() }))
-        .sort((a, b) => a.rank - b.rank)
-        .map(({ value }) => value);
-    }
-    return values;
-  }
-
   #flipStep(
     next: string,
     duration: number,
@@ -340,22 +369,33 @@ export class SfeCell extends HTMLElement {
     });
 
     return new Promise((resolve) => {
-      const timer = window.setTimeout(() => {
-        if (runToken === this.#token && !signal?.aborted) {
+      let remaining = duration;
+      let last = performance.now();
+      let timer = 0;
+      let finished = false;
+      const finish = (commit: boolean): void => {
+        if (finished) return;
+        finished = true;
+        window.clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
+        if (commit && runToken === this.#token && !signal?.aborted) {
           this.#value = next;
           this.#render(next, next);
           this.#cell.classList.remove("is-flipping");
         }
         resolve();
-      }, duration);
-      signal?.addEventListener(
-        "abort",
-        () => {
-          window.clearTimeout(timer);
-          resolve();
-        },
-        { once: true },
-      );
+      };
+      const onAbort = (): void => finish(false);
+      const tick = (): void => {
+        if (signal?.aborted || runToken !== this.#token) return finish(false);
+        const now = performance.now();
+        if (!this.#paused) remaining -= now - last;
+        last = now;
+        if (remaining <= 0) return finish(true);
+        timer = window.setTimeout(tick, Math.min(remaining, 16));
+      };
+      signal?.addEventListener("abort", onAbort, { once: true });
+      tick();
     });
   }
 
@@ -382,6 +422,12 @@ export class SfeCell extends HTMLElement {
 
   #configurationError(message: string): void {
     emit(this, "sfe-config-error", { cell: this, name: this.name, message });
+  }
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "sfe-cell": SfeCell;
   }
 }
 
