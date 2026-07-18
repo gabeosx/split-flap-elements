@@ -3,6 +3,12 @@ name: Release
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing Release Please tag whose artifacts should be rebuilt
+        required: true
+        type: string
 
 permissions:
   actions: write
@@ -26,12 +32,40 @@ jobs:
       - run: npm run validate
 
       - id: release
+        if: github.event_name == 'push'
         uses: googleapis/release-please-action@v5
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-      - if: steps.release.outputs.prs_created == 'true'
+      - id: release_context
+        name: Resolve release context
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          MANUAL_TAG: ${{ inputs.release_tag }}
+          RELEASE_CREATED: ${{ steps.release.outputs.release_created }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            gh release view "$MANUAL_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+            VERSION=${MANUAL_TAG#split-flap-elements-v}
+            test "split-flap-elements-v$VERSION" = "$MANUAL_TAG"
+            test -n "$VERSION"
+            echo "created=true" >> "$GITHUB_OUTPUT"
+            echo "tag=$MANUAL_TAG" >> "$GITHUB_OUTPUT"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "ref=$MANUAL_TAG" >> "$GITHUB_OUTPUT"
+          else
+            echo "created=$RELEASE_CREATED" >> "$GITHUB_OUTPUT"
+            echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+            echo "version=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
+            echo "ref=$RELEASE_SHA" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: github.event_name == 'push' && steps.release.outputs.prs_created == 'true'
         name: Run CI for the Release Please branch
         env:
           GH_TOKEN: ${{ github.token }}
@@ -41,38 +75,39 @@ jobs:
           RELEASE_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq .headRefName)
           gh workflow run ci.yml --ref "$RELEASE_BRANCH"
 
-      - if: steps.release.outputs.release_created == 'true'
+      - if: steps.release_context.outputs.created == 'true'
         name: Check out the released commit
         uses: actions/checkout@v6
         with:
-          ref: ${{ steps.release.outputs.sha }}
+          ref: ${{ steps.release_context.outputs.ref }}
 
-      - if: steps.release.outputs.release_created == 'true'
+      - if: steps.release_context.outputs.created == 'true'
         name: Build release artifact
         id: artifact
         env:
-          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_VERSION: ${{ steps.release_context.outputs.version }}
+          RELEASE_TAG: ${{ steps.release_context.outputs.tag }}
         run: |
           npm ci
           npm run pack:check
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
           test "$PACKAGE_VERSION" = "$RELEASE_VERSION"
-          grep -F "## $RELEASE_VERSION (" CHANGELOG.md
+          grep -F "## [$RELEASE_VERSION]" CHANGELOG.md
           PACKAGE_FILE=$(npm pack --json | node -e "let input=''; process.stdin.on('data', c => input += c).on('end', () => process.stdout.write(JSON.parse(input)[0].filename))")
           node scripts/check-package.mjs "$PACKAGE_FILE"
-          test "${{ steps.release.outputs.tag_name }}" = "split-flap-elements-v$PACKAGE_VERSION"
+          test "$RELEASE_TAG" = "split-flap-elements-v$PACKAGE_VERSION"
           shasum -a 256 "$PACKAGE_FILE" > "$PACKAGE_FILE.sha256"
           echo "file=$PACKAGE_FILE" >> "$GITHUB_OUTPUT"
 
-      - if: steps.release.outputs.release_created == 'true'
+      - if: steps.release_context.outputs.created == 'true'
         name: Attach package to GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG_NAME: ${{ steps.release.outputs.tag_name }}
+          TAG_NAME: ${{ steps.release_context.outputs.tag }}
           PACKAGE_FILE: ${{ steps.artifact.outputs.file }}
         run: gh release upload "$TAG_NAME" "$PACKAGE_FILE" "$PACKAGE_FILE.sha256" --clobber
 
-      - if: steps.release.outputs.release_created == 'true' && vars.NPM_PUBLISH_ENABLED == 'true'
+      - if: github.event_name == 'push' && steps.release_context.outputs.created == 'true' && vars.NPM_PUBLISH_ENABLED == 'true'
         name: Publish to npm through OIDC
         env:
           PACKAGE_FILE: ${{ steps.artifact.outputs.file }}
