@@ -59,4 +59,10 @@ After verifying those exact settings, create the repository variable `NPM_PUBLIS
 
 Merge a reviewed Release Please PR. The same workflow attaches and publishes the exact tested tarball only when `NPM_PUBLISH_ENABLED` equals `true`. Confirm the GitHub Release artifacts, npm version, provenance badge, and live documentation after each release.
 
-If publication fails after the GitHub Release exists, do not delete or retag it. Diagnose the failed workflow and republish the already-attached tarball or rerun the failed job after correcting trusted-publisher configuration.
+If artifact generation fails after the GitHub Release exists, do not delete or retag it. Correct the workflow, then rebuild and attach artifacts from the immutable release tag without publishing:
+
+```sh
+gh workflow run release.yml --ref main -f release_tag="split-flap-elements-vX.Y.Z"
+```
+
+If publication fails after artifacts are attached, diagnose the failed workflow and republish the already-attached tarball or rerun the failed job after correcting trusted-publisher configuration.
