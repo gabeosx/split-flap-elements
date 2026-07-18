@@ -5,7 +5,7 @@ Issues and focused pull requests are welcome.
 ## Setup
 
 ```sh
-npm install
+npm ci
 npm run dev
 ```
 

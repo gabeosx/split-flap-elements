@@ -17,11 +17,13 @@ The merge creates the version tag and GitHub Release. The release workflow valid
 Use Node 22.14 or later and npm 11.5.1 or later.
 
 1. Download the `.tgz` and matching `.sha256` from the GitHub Release—do not run `npm pack` again.
-2. In the download directory, verify the artifact:
+2. In the download directory, set the version to the exact Release Please version and verify the artifact:
 
    ```sh
-   shasum -a 256 -c split-flap-elements-0.1.1.tgz.sha256
-   npm publish split-flap-elements-0.1.1.tgz --access public --dry-run
+   VERSION="X.Y.Z"
+   PACKAGE_FILE="split-flap-elements-${VERSION}.tgz"
+   shasum -a 256 -c "${PACKAGE_FILE}.sha256"
+   npm publish "$PACKAGE_FILE" --access public --dry-run
    ```
 
 3. Sign in to the intended npm owner account with publishing 2FA enabled, verify the package name is still available, then publish the exact tarball. npm will prompt for the one-time password when required:
@@ -29,17 +31,15 @@ Use Node 22.14 or later and npm 11.5.1 or later.
    ```sh
    npm login
    npm whoami
-   npm publish split-flap-elements-0.1.1.tgz --access public
+   npm publish "$PACKAGE_FILE" --access public
    ```
 
 4. Verify the registry result and tarball identity:
 
    ```sh
    npm view split-flap-elements version dist.integrity
-   npm install split-flap-elements@0.1.1
+   npm install "split-flap-elements@${VERSION}"
    ```
-
-Replace `0.1.1` with the version created by Release Please if it changes.
 
 ## Configure subsequent trusted releases
 
