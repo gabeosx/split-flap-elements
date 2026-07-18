@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.0](https://github.com/gabeosx/split-flap-elements/compare/split-flap-elements-v0.1.0...split-flap-elements-v0.2.0) (2026-07-18)
+
+
+### Features
+
+* make split-flap-elements npm-ready ([#6](https://github.com/gabeosx/split-flap-elements/issues/6)) ([1e750bd](https://github.com/gabeosx/split-flap-elements/commit/1e750bd44b600da881fb638c4692a4abaf8db4f1))
+
+
+### Bug Fixes
+
+* randomize demo starting positions ([#4](https://github.com/gabeosx/split-flap-elements/issues/4)) ([627f557](https://github.com/gabeosx/split-flap-elements/commit/627f5574fd325de003edcf22bf8f2e134921bcf7))
+
 ## 0.1.0 (2026-07-17)
 
 
