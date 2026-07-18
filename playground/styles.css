@@ -188,11 +188,11 @@ h3 {
   --sfe-font-size: clamp(0.75rem, 1.8vw, 1.65rem);
 }
 .preset-card[data-preset="custom-words"] sfe-board {
-  --sfe-cell-width: clamp(7.5rem, 14vw, 12rem);
+  --sfe-cell-width: clamp(1.5rem, 2.8vw, 2.4rem);
   --sfe-value-size: 0.8em;
 }
 .preset-card[data-preset="custom-emoji"] sfe-board {
-  --sfe-cell-width: clamp(2.8rem, 5vw, 4.4rem);
+  --sfe-cell-width: clamp(1.4rem, 2.5vw, 2.2rem);
 }
 .preset-actions,
 .preview-actions {

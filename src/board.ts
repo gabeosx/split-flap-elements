@@ -1,5 +1,6 @@
 import { SfeCell } from "./cell.js";
 import { emit } from "./events.js";
+import { DEFAULT_STAGGER, planSpin } from "./motion.js";
 import type {
   CellTiming,
   SequenceFrame,
@@ -114,6 +115,15 @@ export class SfeBoard extends HTMLElement {
       this.#frameIndex,
       Math.max(0, value.length - 1),
     );
+    if (
+      this.isConnected &&
+      this.hasAttribute("autoplay") &&
+      this.#sequence.length > 0 &&
+      this.#state !== "playing" &&
+      this.#state !== "paused"
+    ) {
+      queueMicrotask(() => void this.play());
+    }
   }
 
   get currentFrame(): number {
@@ -128,6 +138,18 @@ export class SfeBoard extends HTMLElement {
   set loop(value: boolean) {
     this.toggleAttribute("loop", value);
   }
+  get autoplay(): boolean {
+    return this.hasAttribute("autoplay");
+  }
+  set autoplay(value: boolean) {
+    this.toggleAttribute("autoplay", value);
+  }
+  get announce(): boolean {
+    return this.hasAttribute("announce");
+  }
+  set announce(value: boolean) {
+    this.toggleAttribute("announce", value);
+  }
 
   async play(): Promise<void> {
     if (this.#sequence.length === 0) {
@@ -136,6 +158,7 @@ export class SfeBoard extends HTMLElement {
       );
       return;
     }
+    if (!this.#validateSequence()) return;
     if (this.#state === "paused") return this.resume();
     if (this.#state === "playing") return;
 
@@ -176,11 +199,15 @@ export class SfeBoard extends HTMLElement {
   }
 
   pause(): void {
-    if (this.#state === "playing") this.#setState("paused");
+    if (this.#state === "playing") {
+      for (const cell of this.cells) cell.pause();
+      this.#setState("paused");
+    }
   }
 
   resume(): void {
     if (this.#state !== "paused") return;
+    for (const cell of this.cells) cell.resume();
     this.#setState("playing");
     for (const resume of this.#resumeWaiters) resume();
     this.#resumeWaiters.clear();
@@ -223,6 +250,7 @@ export class SfeBoard extends HTMLElement {
       this.#configurationError(`Frame ${index} is outside the sequence.`);
       return;
     }
+    if (!this.#validateFrame(this.#sequence[index], index)) return;
     this.stop();
     this.#frameIndex = index;
     const controller = new AbortController();
@@ -242,13 +270,14 @@ export class SfeBoard extends HTMLElement {
     index: number,
     signal: AbortSignal,
   ): Promise<boolean> {
+    if (!this.#validateFrame(frame, index)) return false;
     emit(this, "sfe-frame-start", { frame: index });
     const cells = this.cells;
     const groups = this.#groupsFor(
       frame.settleOrder ?? "forward",
       cells.length,
     );
-    const stagger = Math.max(0, frame.stagger ?? 90);
+    const stagger = Math.max(0, frame.stagger ?? DEFAULT_STAGGER);
     const activeGroups = groups
       .map((group) =>
         group.filter((cellIndex) => {
@@ -271,7 +300,21 @@ export class SfeBoard extends HTMLElement {
         groupIndex === 0
           ? requestedDuration
           : Math.max(requestedDuration, previousDuration + stagger);
-      previousDuration = spinDuration;
+      previousDuration = Math.max(
+        ...group.map((cellIndex) => {
+          const cell = cells[cellIndex]!;
+          const target = frame.values[cell.name]!;
+          const timing = this.#timingFor(frame.timing, cell.name);
+          return planSpin(
+            cell.reel,
+            cell.value,
+            target,
+            timing.intermediateOrder ?? cell.intermediateOrder,
+            spinDuration,
+            timing.flipDuration ?? cell.flipDuration,
+          ).totalDuration;
+        }),
+      );
       return { group, spinDuration };
     });
 
@@ -291,9 +334,12 @@ export class SfeBoard extends HTMLElement {
     if (signal.aborted) return false;
     emit(this, "sfe-frame-settle", { frame: index });
     if (this.hasAttribute("announce")) {
-      const announcement = cells
-        .map((cell) => cell.value)
-        .join(" ")
+      const values = cells.map((cell) => cell.value);
+      const singleCharacterBoard = values.every(
+        (value) => Array.from(value).length <= 1,
+      );
+      const announcement = values
+        .join(singleCharacterBoard ? "" : " ")
         .replace(/\s+/g, " ")
         .trim();
       this.#live.textContent = announcement;
@@ -323,17 +369,26 @@ export class SfeBoard extends HTMLElement {
     if (order === "simultaneous") return [forward];
     if (order === "reverse") return forward.reverse().map((index) => [index]);
     if (order === "center-out") {
-      return forward
-        .sort(
-          (a, b) =>
-            Math.abs(a - (count - 1) / 2) - Math.abs(b - (count - 1) / 2),
-        )
-        .map((index) => [index]);
+      const groups: number[][] = [];
+      let left = Math.floor((count - 1) / 2);
+      let right = Math.ceil((count - 1) / 2);
+      while (left >= 0 && right < count) {
+        groups.push(left === right ? [left] : [left, right]);
+        left -= 1;
+        right += 1;
+      }
+      return groups;
     }
     if (order === "edges-in") {
-      return forward
-        .sort((a, b) => Math.min(a, count - 1 - a) - Math.min(b, count - 1 - b))
-        .map((index) => [index]);
+      const groups: number[][] = [];
+      let left = 0;
+      let right = count - 1;
+      while (left <= right) {
+        groups.push(left === right ? [left] : [left, right]);
+        left += 1;
+        right -= 1;
+      }
+      return groups;
     }
     return forward.map((index) => [index]);
   }
@@ -347,6 +402,159 @@ export class SfeBoard extends HTMLElement {
     )
       return timing as CellTiming;
     return (timing as Readonly<Record<string, CellTiming>>)[name] ?? {};
+  }
+
+  #validateSequence(): boolean {
+    let valid = true;
+    for (let index = 0; index < this.#sequence.length; index += 1) {
+      if (!this.#validateFrame(this.#sequence[index], index)) valid = false;
+    }
+    return valid;
+  }
+
+  #validateFrame(frame: unknown, index: number): frame is SequenceFrame {
+    if (!frame || typeof frame !== "object" || Array.isArray(frame)) {
+      this.#configurationError(`Frame ${index} must be an object.`, index);
+      return false;
+    }
+    const values = (frame as { values?: unknown }).values;
+    if (!values || typeof values !== "object" || Array.isArray(values)) {
+      this.#configurationError(
+        `Frame ${index} must provide a values object.`,
+        index,
+      );
+      return false;
+    }
+    const entries = Object.entries(values);
+    if (entries.length === 0) {
+      this.#configurationError(`Frame ${index} has no cell values.`, index);
+      return false;
+    }
+    const cellsByName = new Map(this.cells.map((cell) => [cell.name, cell]));
+    let valid = true;
+    if (cellsByName.size !== this.cells.length) {
+      this.#configurationError(
+        `Frame ${index} cannot target cells with duplicate names.`,
+        index,
+      );
+      valid = false;
+    }
+    for (const [name, target] of entries) {
+      const cell = cellsByName.get(name);
+      if (!cell) {
+        this.#configurationError(
+          `Frame ${index} targets unknown cell “${name}”.`,
+          index,
+        );
+        valid = false;
+      } else if (typeof target !== "string") {
+        this.#configurationError(
+          `Frame ${index} value for “${name}” must be a string.`,
+          index,
+        );
+        valid = false;
+      } else if (!cell.reel.includes(target)) {
+        this.#configurationError(
+          `Frame ${index} value “${target}” is not present in “${name}” reel.`,
+          index,
+        );
+        valid = false;
+      }
+    }
+    const candidate = frame as Record<string, unknown>;
+    for (const key of ["hold", "stagger"] as const) {
+      const value = candidate[key];
+      if (
+        value !== undefined &&
+        (typeof value !== "number" || !Number.isFinite(value) || value < 0)
+      ) {
+        this.#configurationError(
+          `Frame ${index} ${key} must be a non-negative number.`,
+          index,
+        );
+        valid = false;
+      }
+    }
+    if (!this.#validSettleOrder(candidate.settleOrder, this.cells.length)) {
+      this.#configurationError(
+        `Frame ${index} has an invalid settleOrder.`,
+        index,
+      );
+      valid = false;
+    }
+    if (!this.#validTiming(candidate.timing, cellsByName)) {
+      this.#configurationError(`Frame ${index} has invalid timing.`, index);
+      valid = false;
+    }
+    return valid;
+  }
+
+  #validSettleOrder(value: unknown, cellCount: number): boolean {
+    if (value === undefined) return true;
+    if (
+      value === "forward" ||
+      value === "reverse" ||
+      value === "simultaneous" ||
+      value === "center-out" ||
+      value === "edges-in"
+    )
+      return true;
+    if (!Array.isArray(value) || value.length === 0) return false;
+    const seen = new Set<number>();
+    return value.every((item) => {
+      const indexes = Array.isArray(item) ? item : [item];
+      if (indexes.length === 0) return false;
+      return indexes.every((cellIndex) => {
+        if (
+          !Number.isInteger(cellIndex) ||
+          cellIndex < 0 ||
+          cellIndex >= cellCount ||
+          seen.has(cellIndex)
+        )
+          return false;
+        seen.add(cellIndex);
+        return true;
+      });
+    });
+  }
+
+  #validTiming(
+    value: unknown,
+    cellsByName: ReadonlyMap<string, SfeCell>,
+  ): boolean {
+    if (value === undefined) return true;
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      return false;
+    const timing = value as Record<string, unknown>;
+    const timingKeys = ["flipDuration", "spinDuration", "intermediateOrder"];
+    if (timingKeys.some((key) => key in timing))
+      return this.#validCellTiming(timing);
+    return Object.entries(timing).every(
+      ([name, cellTiming]) =>
+        cellsByName.has(name) &&
+        Boolean(cellTiming) &&
+        typeof cellTiming === "object" &&
+        !Array.isArray(cellTiming) &&
+        this.#validCellTiming(cellTiming as Record<string, unknown>),
+    );
+  }
+
+  #validCellTiming(timing: Readonly<Record<string, unknown>>): boolean {
+    for (const key of ["flipDuration", "spinDuration"] as const) {
+      const value = timing[key];
+      if (
+        value !== undefined &&
+        (typeof value !== "number" || !Number.isFinite(value) || value < 0)
+      )
+        return false;
+    }
+    const order = timing.intermediateOrder;
+    return (
+      order === undefined ||
+      order === "forward" ||
+      order === "reverse" ||
+      order === "random"
+    );
   }
 
   #whilePaused(signal: AbortSignal): Promise<void> {
@@ -366,8 +574,14 @@ export class SfeBoard extends HTMLElement {
     );
   }
 
-  #configurationError(message: string): void {
-    emit(this, "sfe-config-error", { message, frame: this.#frameIndex });
+  #configurationError(message: string, frame = this.#frameIndex): void {
+    emit(this, "sfe-config-error", { message, frame });
+  }
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "sfe-board": SfeBoard;
   }
 }
 

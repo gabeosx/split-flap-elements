@@ -72,11 +72,15 @@ const holdInput = document.querySelector("#builder-hold");
 const staggerInput = document.querySelector("#builder-stagger");
 const loopInput = document.querySelector("#builder-loop");
 const themeInput = document.querySelector("#builder-theme");
+const importInput = document.querySelector("#builder-import");
 const status = document.querySelector("#builder-status");
 const generatedCode = document.querySelector("#generated-code");
 const previewPanel = document.querySelector("#preview-panel");
 let builderPlayTimer;
+let builderRenderTimer;
 let activeBuilderConfiguration = null;
+let renderedFormSignature = "";
+let scheduledFormSignature = "";
 
 function splitGraphemes(value) {
   if (!segmenter) return Array.from(value);
@@ -111,7 +115,7 @@ function createCell(name, { preset, reel, value, span = 1 }) {
   cell.span = span;
   if (reel) cell.reel = reel;
   else cell.preset = preset;
-  cell.value = value;
+  if (value !== undefined) cell.value = value;
   return cell;
 }
 
@@ -126,7 +130,7 @@ function framesForBoard(frames, cellCount, fill, controls) {
       hold: controls.hold,
       settleOrder: controls.order,
       stagger: controls.stagger,
-      timing: { spinDuration: controls.spin, flipDuration: 90 },
+      timing: { spinDuration: controls.spin },
     };
   });
 }
@@ -157,25 +161,19 @@ function setupSample(sample) {
   const cellCount = Math.max(...tokenFrames.map((frame) => frame.length));
   const fill = isCustom ? sample.reel[0] : " ";
   for (let index = 0; index < cellCount; index += 1) {
-    const target = tokenFrames[0][index] ?? fill;
-    const reel = sample.reel ?? REEL_PRESETS[sample.id];
-    const alternatives = reel.filter((value) => value !== target);
-    const restingValue =
-      alternatives[Math.floor(Math.random() * alternatives.length)] ?? target;
     sampleBoard.append(
       createCell(`cell-${index}`, {
         preset: isCustom ? undefined : sample.id,
         reel: sample.reel,
-        value: restingValue,
         span: isCustom ? (sample.id === "custom-words" ? 5 : 2) : 1,
       }),
     );
   }
   sampleBoard.sequence = framesForBoard(tokenFrames, cellCount, fill, {
-    hold: 1400,
+    hold: 2400,
     order: "center-out",
-    stagger: 35,
-    spin: 480,
+    stagger: 120,
+    spin: 1400,
   });
   article.querySelector(".sample-stage").append(sampleBoard);
   article
@@ -249,11 +247,19 @@ function codeFor(configuration, sequence) {
     stagger: frame.stagger,
     timing: frame.timing,
   }));
-  const startingPosition =
+  const startingSetup =
     startInput.value === "random"
-      ? `const choices = cell.reel.filter((value) => value !== target);\n    if (choices.length > 0) {\n      cell.value = choices[Math.floor(Math.random() * choices.length)];\n    }`
-      : `const choices = cell.reel.filter((value) => value !== target);\n    if (cell.reel.includes(" ")) cell.value = " ";\n    else if (choices.length > 0) cell.value = choices[0];`;
-  return `<sfe-board id="board"${loop}>\n${cells}\n</sfe-board>\n\n<script type="module">\n  import "split-flap-elements";\n\n  const board = document.querySelector("#board");${customSetup}\n  const sequence = ${JSON.stringify(printableSequence, null, 2)};\n  board.sequence = sequence;\n\n  const firstFrame = sequence[0].values;\n  for (const cell of board.cells) {\n    const target = firstFrame[cell.name];\n    ${startingPosition}\n  }\n\n  board.play();\n</script>`;
+      ? "\n  // Cells choose random reel positions by default.\n"
+      : `\n  for (const cell of board.cells) {\n    if (cell.reel.includes(" ")) cell.value = " ";\n    else cell.value = cell.reel[0];\n  }\n`;
+  const importSpecifier =
+    importInput.value === "cdn"
+      ? `https://esm.sh/split-flap-elements@__SFE_VERSION__`
+      : "split-flap-elements";
+  const importNote =
+    importInput.value === "cdn"
+      ? "\n  // This URL works after the selected package version is published to npm."
+      : "";
+  return `<sfe-board id="board"${loop}>\n${cells}\n</sfe-board>\n\n<script type="module">${importNote}\n  import "${importSpecifier}";\n\n  const board = document.querySelector("#board");${customSetup}\n  const sequence = ${JSON.stringify(printableSequence, null, 2)};\n  board.sequence = sequence;${startingSetup}\n  board.play();\n</script>`;
 }
 
 function showStatus(message, isError = false) {
@@ -288,6 +294,9 @@ function renderBuilder() {
   window.clearTimeout(builderPlayTimer);
   board.stop();
   board.replaceChildren();
+  renderedFormSignature = JSON.stringify(
+    Array.from(new FormData(form).entries()),
+  );
   try {
     const configuration = builderConfiguration();
     activeBuilderConfiguration = configuration;
@@ -297,7 +306,10 @@ function renderBuilder() {
         createCell(`cell-${index}`, {
           preset: configuration.reel ? undefined : configuration.preset,
           reel: configuration.reel,
-          value: restingValueFor(configuration, index),
+          value:
+            startInput.value === "blank"
+              ? restingValueFor(configuration, index)
+              : undefined,
         }),
       );
     }
@@ -345,12 +357,28 @@ function updateOutputs() {
 presetInput.addEventListener("change", () => {
   framesInput.value = BUILDER_DEFAULTS[presetInput.value];
   syncPresetFields();
-  renderBuilder();
 });
-form.addEventListener("input", () => {
+function scheduleBuilderRender() {
   updateOutputs();
-  renderBuilder();
-});
+  const signature = JSON.stringify(Array.from(new FormData(form).entries()));
+  if (
+    signature === renderedFormSignature ||
+    signature === scheduledFormSignature
+  )
+    return;
+  scheduledFormSignature = signature;
+  window.clearTimeout(builderPlayTimer);
+  window.clearTimeout(builderRenderTimer);
+  board.stop();
+  builderRenderTimer = window.setTimeout(() => {
+    builderRenderTimer = undefined;
+    scheduledFormSignature = "";
+    renderBuilder();
+  }, 0);
+}
+
+form.addEventListener("input", scheduleBuilderRender);
+form.addEventListener("change", scheduleBuilderRender);
 themeInput.addEventListener("change", () => {
   previewPanel.className = `preview-panel theme-${themeInput.value}`;
 });

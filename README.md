@@ -1,175 +1,230 @@
 # split-flap-elements
 
-Configurable, accessible split-flap displays built with Web Components. Use letters, numbers, words, symbols, or emoji; schedule the order in which cells settle; and style the board through CSS custom properties and parts.
+Dependency-free, accessible split-flap displays built with Web Components. Use individual letters, numbers, words, symbols, or emoji; coordinate how cells settle; and restyle every surface with CSS custom properties and parts.
 
 [![CI](https://github.com/gabeosx/split-flap-elements/actions/workflows/ci.yml/badge.svg)](https://github.com/gabeosx/split-flap-elements/actions/workflows/ci.yml)
 [![MIT license](https://img.shields.io/badge/license-MIT-17191b.svg)](./LICENSE)
 
-[![Fictional departure board demonstrating split-flap-elements](./assets/demo.gif)](https://gabeosx.github.io/split-flap-elements/)
+[![Fictional departure board demonstrating split-flap-elements](https://raw.githubusercontent.com/gabeosx/split-flap-elements/main/assets/demo.gif)](https://gabeosx.github.io/split-flap-elements/)
 
-**[Open the interactive demo](https://gabeosx.github.io/split-flap-elements/)** ·
-**[Explore presets and build a board](https://gabeosx.github.io/split-flap-elements/playground/)**
+**[Open the live demo](https://gabeosx.github.io/split-flap-elements/)** · **[Try every preset and build a board](https://gabeosx.github.io/split-flap-elements/playground/)**
 
-The playground includes live samples for every built-in preset plus custom word
-and emoji reels. Its visual builder turns frames, timing, settle order, looping,
-and panel choices into a working preview and copyable HTML.
+The primary import registers `<sfe-board>` and `<sfe-cell>`. The package has zero runtime dependencies and uses a system font stack.
+
+Editor and catalog tooling can discover both elements through the packaged Custom Elements Manifest.
 
 ## Install
 
-The first npm release is being prepared. Until it is available, clone the repository and run the demo locally:
-
-```sh
-git clone https://github.com/gabeosx/split-flap-elements.git
-cd split-flap-elements
-npm install
-npm run dev
-```
-
-After publication:
+The npm release is forthcoming. After publication:
 
 ```sh
 npm install split-flap-elements
 ```
 
+To run the current source locally, use a web server—the demo will not work by opening its HTML with `file://`:
+
+```sh
+git clone https://github.com/gabeosx/split-flap-elements.git
+cd split-flap-elements
+npm ci
+npm run dev
+```
+
 ## Quick start
+
+With a bundler:
 
 ```html
 <sfe-board id="board" loop announce>
-  <sfe-cell name="gate" preset="alpha" value="A"></sfe-cell>
-  <sfe-cell name="status" span="5"></sfe-cell>
+  <sfe-cell name="letter-0" preset="alpha"></sfe-cell>
+  <sfe-cell name="letter-1" preset="alpha"></sfe-cell>
+  <sfe-cell name="letter-2" preset="alpha"></sfe-cell>
 </sfe-board>
 
 <script type="module">
   import "split-flap-elements";
 
   const board = document.querySelector("#board");
-  const status = board.querySelector('[name="status"]');
-  status.reel = ["ON TIME", "BOARDING", "LAST CALL"];
-  status.value = "ON TIME";
-
   board.sequence = [
-    {
-      values: { gate: "A", status: "BOARDING" },
-      hold: 2400,
-      settleOrder: "forward",
-      stagger: 90,
-    },
-    {
-      values: { gate: "C", status: "LAST CALL" },
-      settleOrder: "center-out",
-    },
+    { values: { "letter-0": "N", "letter-1": "Y", "letter-2": "C" } },
+    { values: { "letter-0": "L", "letter-1": "A", "letter-2": "X" } },
   ];
-
   board.play();
 </script>
 ```
 
-Values are plain text. A requested value must exist in its cell's reel; invalid configuration dispatches `sfe-config-error` instead of silently producing the wrong display.
+Each uninitialized cell chooses a random position from its reel. Set `value` before connection when you need a deterministic start, including the alpha preset's blank value:
 
-## Cells
+```html
+<sfe-cell name="letter" preset="alpha" value=" "></sfe-cell>
+```
 
-`<sfe-cell>` can use a built-in preset or any non-empty array of strings.
+After npm publication, a no-build browser import can use an ESM CDN:
+
+```html
+<script type="module">
+  import "https://esm.sh/split-flap-elements";
+</script>
+```
+
+Pin an exact package version in production. The primary entry point is browser-only because registration requires `HTMLElement` and `customElements`; client-only or deferred import is required in SSR applications. `split-flap-elements/presets` is DOM-free.
+
+The live builder's **Import style** control generates either the bare npm specifier for bundlers or a version-pinned ESM CDN URL for direct browser use.
+
+## Reels and cells
+
+Built-in presets all include a blank space:
+
+| Preset         | Reel                       |
+| -------------- | -------------------------- |
+| `alpha`        | space, `A`–`Z`             |
+| `numeric`      | space, `0`–`9`             |
+| `alphanumeric` | space, `A`–`Z`, `0`–`9`    |
+| `symbols`      | space, punctuation, arrows |
+
+Use the `reel` property for arbitrary plain-text tokens:
 
 ```js
 const cell = document.querySelector("sfe-cell");
-
-cell.reel = ["READY", "BOARDING", "DEPARTED", "✓"];
-cell.value = "READY";
-cell.flipDuration = 120;
-cell.spinDuration = 900;
-cell.intermediateOrder = "random";
-
+cell.reel = ["ON TIME", "BOARDING", "LAST CALL", "✓"];
 await cell.spinTo("BOARDING");
 ```
 
-Available presets are `alpha`, `numeric`, `alphanumeric`, and `symbols`. HTML-authored custom reels may use a JSON array:
+HTML-authored reels use a non-empty JSON array of strings:
 
 ```html
 <sfe-cell reel='["SUNNY","RAIN","☂"]' value="SUNNY" span="4"></sfe-cell>
 ```
 
-## Sequences
+Targets absent from a cell's reel are rejected with `sfe-config-error` and do not corrupt playback state.
 
-Each frame has a `values` record keyed by cell `name`. Frames can also set `hold`, `stagger`, `settleOrder`, and timing for every cell or individual named cells.
+### Cell API
+
+| HTML attribute       | Property            | Default          | Purpose                               |
+| -------------------- | ------------------- | ---------------- | ------------------------------------- |
+| `name`               | `name`              | `""`             | Key used in frame `values`            |
+| `preset`             | `preset`            | `alpha`          | Built-in reel                         |
+| `reel`               | `reel`              | alpha reel       | JSON attribute or `string[]` property |
+| `value`              | `value`             | random reel item | Current/initial value                 |
+| `span`               | `span`              | `1`              | Relative cell width/grid-column span  |
+| `flip-duration`      | `flipDuration`      | `140` ms         | Preferred per-flap cadence            |
+| `spin-duration`      | `spinDuration`      | `1400` ms        | Minimum spin window                   |
+| `intermediate-order` | `intermediateOrder` | `forward`        | `forward`, `reverse`, or `random`     |
+
+`spinTo(target, options?)` returns `Promise<boolean>`. It resolves `false` when cancelled, aborted, or invalid. `cancel()`, `pause()`, and `resume()` control an active cell spin; boards call them automatically.
+
+The default motion advances through adjacent reel values at a readable mechanical cadence. To preserve reel order and coordinated settling, the board may tune the preferred cadence within a restrained range or add a complete revolution. Cells spin concurrently, and longer paths naturally show more flaps. Set `spinDuration: 0` for an immediate settle.
+
+## Sequences and boards
+
+Assign frames through the JavaScript-only `sequence` property. Each frame needs a `values` record keyed by cell name; partial frames are allowed.
 
 ```js
 board.sequence = [
   {
-    values: { hour: "1", minute: "4", status: "ON TIME" },
-    hold: 1800,
-    stagger: 60,
-    settleOrder: [[0, 1], 2],
+    values: { gate: "A", status: "BOARDING" },
+    hold: 2400,
+    settleOrder: "forward",
+    stagger: 120,
+    timing: { spinDuration: 1400, flipDuration: 140 },
+  },
+  {
+    values: { gate: "C", status: "LAST CALL" },
     timing: {
-      status: { spinDuration: 1200, intermediateOrder: "reverse" },
+      status: { spinDuration: 2100, intermediateOrder: "reverse" },
     },
   },
 ];
 ```
 
-Settle orders:
+Frame defaults are a `2400` ms hold, `forward` settle order, and `120` ms minimum gap between settle groups. `timing` may be one `CellTiming` object or a record keyed by cell name.
 
-- `forward`
-- `reverse`
-- `simultaneous`
-- `center-out`
-- `edges-in`
-- A custom array of cell indexes. Nested arrays settle as one group; omitted cells are appended in document order.
-
-All targeted cells begin spinning together. The settle order controls when each
-cell stops, and `stagger` sets the minimum delay between stop groups. With
-`simultaneous`, every cell starts and stops together.
-
-Set initial positions before playback when you want each reel to enter from a
-different point:
+Settle orders are `forward`, `reverse`, `simultaneous`, `center-out`, `edges-in`, or a custom array of cell indexes. Center-out and edges-in settle symmetric pairs together. Nested indexes form custom groups; omitted cells are appended in document order:
 
 ```js
-const firstFrame = board.sequence[0].values;
-for (const cell of board.cells) {
-  const choices = cell.reel.filter((value) => value !== firstFrame[cell.name]);
-  if (choices.length > 0) {
-    cell.value = choices[Math.floor(Math.random() * choices.length)];
-  }
+{
+  settleOrder: [[0, 1], [2, 3], 4];
 }
 ```
 
-Playback methods are `play()`, `pause()`, `resume()`, `stop()`, `replay()`, `next()`, `previous()`, and `seek(index)`.
+All targeted cells begin before the first ordered settle. The board lengthens later groups as needed; it does not run cells serially.
+
+### Board API
+
+Boolean attributes/properties are `autoplay`, `loop`, and `announce`. `autoplay` also works when `sequence` is assigned after the board connects. `announce` enables polite announcements only after a complete frame settles.
+
+Read-only properties are `cells`, `currentFrame`, and `playbackState`. Playback methods are:
+
+```js
+await board.play();
+board.pause();
+board.resume();
+board.stop();
+await board.replay();
+await board.next();
+await board.previous();
+await board.seek(2);
+```
+
+Pausing freezes active flaps and hold timers. `stop()` cancels active work and leaves the displayed values where they stopped.
 
 ## Events
 
-All events bubble across the shadow boundary and include relevant state in `event.detail`.
+Every event bubbles and is composed, so applications can listen on the board or `document` without reaching into Shadow DOM.
 
-| Event                | When it fires                                 |
-| -------------------- | --------------------------------------------- |
-| `sfe-flip-start`     | A cell begins moving toward a target          |
-| `sfe-flip`           | A cell shows an intermediate value            |
-| `sfe-settle`         | A cell reaches its requested value            |
-| `sfe-frame-start`    | A frame starts                                |
-| `sfe-frame-settle`   | Every requested cell in a frame has settled   |
-| `sfe-sequence-start` | Playback starts                               |
-| `sfe-sequence-end`   | Non-looping playback finishes                 |
-| `sfe-playback-state` | Playback state changes                        |
-| `sfe-config-error`   | A reel, target, frame, or sequence is invalid |
+| Event                | Detail boundary                                                 |
+| -------------------- | --------------------------------------------------------------- |
+| `sfe-flip-start`     | Cell starts moving; includes cell, name, target, previous value |
+| `sfe-flip`           | One intermediate flap; includes current transition values       |
+| `sfe-settle`         | Cell reaches its target                                         |
+| `sfe-frame-start`    | A validated frame starts                                        |
+| `sfe-frame-settle`   | All targeted cells settle                                       |
+| `sfe-sequence-start` | Playback starts                                                 |
+| `sfe-sequence-end`   | Non-looping playback ends                                       |
+| `sfe-playback-state` | State becomes `idle`, `playing`, `paused`, or `stopped`         |
+| `sfe-config-error`   | Invalid reel, target, frame, sequence, or seek boundary         |
 
-The package intentionally leaves sound to the application. Attach it to events without coupling audio policy to the visual component:
+Sound is intentionally external:
 
 ```js
-board.addEventListener("sfe-flip", () => audio.play());
+board.addEventListener("sfe-flip", () => {
+  void flapAudio.play().catch(() => {});
+});
 ```
 
 ## Styling
 
-The elements use Shadow DOM, CSS custom properties, and `::part()`.
+Both elements use open Shadow DOM. Custom properties inherit from the board into its cells.
+
+| Custom property          | Default                     |
+| ------------------------ | --------------------------- |
+| `--sfe-board-background` | `#0c0d0e`                   |
+| `--sfe-board-padding`    | `0.7rem`                    |
+| `--sfe-board-gap`        | `0.12rem`                   |
+| `--sfe-board-radius`     | `0.22rem`                   |
+| `--sfe-board-border`     | subtle 1 px border          |
+| `--sfe-font-family`      | system monospace stack      |
+| `--sfe-font-size`        | `1rem`                      |
+| `--sfe-font-weight`      | `700`                       |
+| `--sfe-letter-spacing`   | `-0.04em`                   |
+| `--sfe-value-size`       | `1.35em`                    |
+| `--sfe-cell-width`       | `1.9em`                     |
+| `--sfe-cell-height`      | `2.5em`                     |
+| `--sfe-cell-background`  | `#17191b`                   |
+| `--sfe-cell-color`       | `#f3f1e8`                   |
+| `--sfe-cell-border`      | subtle 1 px border          |
+| `--sfe-cell-radius`      | `0.08em`                    |
+| `--sfe-cell-shadow`      | dark drop shadow            |
+| `--sfe-split-line`       | dark split line             |
+| `--sfe-step-duration`    | managed from `flipDuration` |
 
 ```css
 sfe-board {
   --sfe-board-background: #0b0c0d;
-  --sfe-board-padding: 1rem;
-  --sfe-board-gap: 0.2rem;
   --sfe-cell-background: #1b1d1f;
   --sfe-cell-color: #f5f1e8;
   --sfe-cell-width: 2em;
   --sfe-cell-height: 2.7em;
-  --sfe-font-family: ui-monospace, monospace;
 }
 
 sfe-cell::part(split-line) {
@@ -177,28 +232,25 @@ sfe-cell::part(split-line) {
 }
 ```
 
-Parts include `board`, `grid`, `cell`, `top`, `bottom`, `moving-top`, `moving-bottom`, and `split-line`.
+Parts are `board`, `grid`, `cell`, `top`, `bottom`, `moving-top`, `moving-bottom`, and `split-line`.
 
-## Accessibility
+## Accessibility and browser support
 
-- Motion is removed when the user requests reduced motion.
-- Intermediate values are visual only and are not announced.
-- Add the `announce` attribute to a board to announce each settled frame through a polite live region.
-- Demo controls have keyboard focus styles and native labels.
+- `prefers-reduced-motion: reduce` removes intermediate flips and settles directly.
+- Each cell exposes one accessible value; duplicated mechanical layers are hidden from assistive technology.
+- Intermediate reel values are not announced.
+- `announce` opts a board into an atomic polite live region after each settled frame; adjacent single-character cells are announced as normal words.
+- Demo and builder controls use native keyboard controls and visible focus styles.
+- Current Chromium, Firefox, and WebKit are tested. The package requires Custom Elements, Shadow DOM, CSS custom properties, private class fields, and ES modules.
 
-## Browser support
-
-The test matrix covers current Chromium, Firefox, and WebKit. The package requires Custom Elements, Shadow DOM, CSS custom properties, private class fields, and ES modules.
-
-## Development
+## Development and releases
 
 ```sh
-npm install
-npm run dev
+npm ci
 npm run validate
 ```
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the contribution and release conventions.
+See [CONTRIBUTING.md](./CONTRIBUTING.md), [SECURITY.md](./SECURITY.md), and the maintainer [release runbook](./docs/releasing.md). Releases use Conventional Commits and Release Please; npm publication remains disabled until trusted publishing is configured.
 
 ## License
 

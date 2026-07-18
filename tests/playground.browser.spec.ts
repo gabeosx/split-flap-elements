@@ -39,6 +39,25 @@ test("the builder updates its preview and generated code", async ({ page }) => {
   await expect(page.locator("#generated-code")).toContainText(
     '"settleOrder": "center-out"',
   );
+  await expect(page.locator("#generated-code")).toContainText(
+    'import "split-flap-elements"',
+  );
+
+  await page.locator("#builder-import").selectOption("cdn");
+  await expect(page.locator("#generated-code")).toContainText(
+    "https://esm.sh/split-flap-elements@",
+  );
+  await expect(page.locator("#generated-code")).not.toContainText(
+    "__SFE_VERSION__",
+  );
+  await page.locator("#builder-import").evaluate((element) => {
+    const select = element as HTMLSelectElement;
+    select.value = "bundler";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await expect(page.locator("#generated-code")).toContainText(
+    'import "split-flap-elements"',
+  );
 
   await page.locator("#builder-theme").selectOption("signal");
   await expect(page.locator("#preview-panel")).toHaveClass(/theme-signal/);
@@ -55,7 +74,9 @@ test("the builder updates its preview and generated code", async ({ page }) => {
   ).toBeVisible();
 });
 
-test("a single phrase animates from blanks and replays", async ({ page }) => {
+test("a single phrase animates from random starts and replays", async ({
+  page,
+}) => {
   await page.goto("/playground/");
   await page.locator("#builder-board").evaluate((element) => {
     (window as any).builderFlipCount = 0;
@@ -77,12 +98,18 @@ test("a single phrase animates from blanks and replays", async ({ page }) => {
 
   await page.locator("#builder-preset").selectOption("alpha");
   await expect(page.locator("#builder-start")).toHaveValue("random");
-  await page.locator("#builder-spin").fill("160");
+  await page.locator("#builder-spin").fill("140");
+  await page.locator("#builder-order").selectOption("simultaneous");
   await page.locator("#builder-frames").fill("NEW YORK");
+  await page.waitForTimeout(100);
+  await page
+    .locator("#builder-board")
+    .evaluate((element: any) => element.stop());
   await page.evaluate(() => {
     (window as any).builderFlipCount = 0;
     (window as any).builderEvents = [];
   });
+  await page.locator("#preview-replay").click();
 
   await expect(page.locator("#builder-board sfe-cell")).toHaveCount(8);
   await expect
@@ -105,7 +132,11 @@ test("a single phrase animates from blanks and replays", async ({ page }) => {
   expect(
     events
       .filter((event: any) => event.type === "start")
-      .every((event: any) => event.previousValue !== event.target),
+      .every(
+        (event: any) =>
+          typeof event.previousValue === "string" &&
+          typeof event.target === "string",
+      ),
   ).toBe(true);
   const flipsAfterFirstPlay = await page.evaluate(
     () => (window as any).builderFlipCount,
@@ -119,7 +150,7 @@ test("a single phrase animates from blanks and replays", async ({ page }) => {
     "Replay resets and spins it again",
   );
   await expect(page.locator("#generated-code")).toContainText(
-    "Math.floor(Math.random() * choices.length)",
+    "Cells choose random reel positions by default",
   );
 });
 

@@ -17,10 +17,23 @@
     "split-flap",
     "web-components",
     "custom-elements",
-    "departure-board"
+    "departure-board",
+    "animation",
+    "accessible",
+    "flip-clock"
   ],
-  "engines": {
-    "node": ">=22.14"
+  "publishConfig": {
+    "access": "public"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": ">=22.14"
+    },
+    "packageManager": {
+      "name": "npm",
+      "version": ">=11"
+    }
   },
   "packageManager": "npm@11.17.0",
   "exports": {
@@ -43,8 +56,10 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "customElements": "./custom-elements.json",
   "files": [
     "dist",
+    "custom-elements.json",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"
@@ -60,7 +75,8 @@
     "test:browser": "playwright test",
     "test:visual": "playwright test tests/visual.spec.ts",
     "demo:build": "npm run build && node scripts/build-demo.mjs",
-    "demo:gif": "node scripts/capture-demo.mjs",
+    "demo:gif": "npm run build && node scripts/capture-demo.mjs",
+    "demo:social": "npm run build && node scripts/capture-social.mjs",
     "pack:check": "npm run build && node scripts/check-package.mjs",
     "validate": "npm run lint && npm run typecheck && npm run test && npm run test:browser && npm run pack:check"
   },

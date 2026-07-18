@@ -7,6 +7,31 @@
       name="description"
       content="Explore split-flap reel presets and build a working board without writing configuration by hand."
     />
+    <meta name="theme-color" content="#0c0d0e" />
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:title"
+      content="Preset gallery + builder — split-flap-elements"
+    />
+    <meta
+      property="og:description"
+      content="Explore every split-flap preset, configure a live board, and copy production-ready code."
+    />
+    <meta
+      property="og:url"
+      content="https://gabeosx.github.io/split-flap-elements/playground/"
+    />
+    <meta
+      property="og:image"
+      content="https://gabeosx.github.io/split-flap-elements/assets/social-preview.png"
+    />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="640" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link
+      rel="canonical"
+      href="https://gabeosx.github.io/split-flap-elements/playground/"
+    />
     <title>Preset gallery + builder — split-flap-elements</title>
     <link rel="stylesheet" href="./styles.css" />
     <script type="module" src="./playground.js"></script>
@@ -122,19 +147,19 @@ READY</textarea>
                 </select>
               </label>
               <label>
-                Spin <output id="spin-output">720 ms</output>
+                Minimum spin <output id="spin-output">1400 ms</output>
                 <input
                   id="builder-spin"
                   name="spin"
                   type="range"
                   min="0"
-                  max="1600"
-                  step="40"
-                  value="720"
+                  max="2800"
+                  step="140"
+                  value="1400"
                 />
               </label>
               <label>
-                Hold <output id="hold-output">1800 ms</output>
+                Hold <output id="hold-output">2400 ms</output>
                 <input
                   id="builder-hold"
                   name="hold"
@@ -142,11 +167,11 @@ READY</textarea>
                   min="300"
                   max="4000"
                   step="100"
-                  value="1800"
+                  value="2400"
                 />
               </label>
               <label>
-                Stagger <output id="stagger-output">60 ms</output>
+                Stagger <output id="stagger-output">120 ms</output>
                 <input
                   id="builder-stagger"
                   name="stagger"
@@ -154,7 +179,7 @@ READY</textarea>
                   min="0"
                   max="240"
                   step="10"
-                  value="60"
+                  value="120"
                 />
               </label>
               <label>
@@ -163,6 +188,13 @@ READY</textarea>
                   <option value="terminal">Terminal</option>
                   <option value="paper">Paper</option>
                   <option value="signal">Signal</option>
+                </select>
+              </label>
+              <label>
+                Import style
+                <select id="builder-import" name="import">
+                  <option value="bundler">NPM / bundler</option>
+                  <option value="cdn">Browser / CDN</option>
                 </select>
               </label>
               <label class="check-control">

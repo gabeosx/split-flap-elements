@@ -1,0 +1,301 @@
+{
+  "$schema": "https://unpkg.com/custom-elements-manifest@2.1.0/schema.json",
+  "schemaVersion": "2.1.0",
+  "modules": [
+    {
+      "kind": "javascript-module",
+      "path": "dist/cell.js",
+      "declarations": [
+        {
+          "kind": "class",
+          "name": "SfeCell",
+          "description": "A configurable split-flap cell with a built-in or custom plain-text reel.",
+          "customElement": true,
+          "tagName": "sfe-cell",
+          "superclass": { "name": "HTMLElement" },
+          "members": [
+            {
+              "kind": "field",
+              "name": "name",
+              "type": { "text": "string" },
+              "attribute": "name"
+            },
+            {
+              "kind": "field",
+              "name": "value",
+              "type": { "text": "string" },
+              "attribute": "value"
+            },
+            {
+              "kind": "field",
+              "name": "reel",
+              "type": { "text": "string[]" },
+              "attribute": "reel"
+            },
+            {
+              "kind": "field",
+              "name": "preset",
+              "type": { "text": "ReelPreset" },
+              "attribute": "preset",
+              "default": "alpha"
+            },
+            {
+              "kind": "field",
+              "name": "span",
+              "type": { "text": "number" },
+              "attribute": "span",
+              "default": "1",
+              "description": "Positive integer width multiplier and grid-column span."
+            },
+            {
+              "kind": "field",
+              "name": "flipDuration",
+              "type": { "text": "number" },
+              "attribute": "flip-duration",
+              "default": "140",
+              "description": "Preferred per-flap cadence in milliseconds."
+            },
+            {
+              "kind": "field",
+              "name": "spinDuration",
+              "type": { "text": "number" },
+              "attribute": "spin-duration",
+              "default": "1400"
+            },
+            {
+              "kind": "field",
+              "name": "intermediateOrder",
+              "type": { "text": "IntermediateOrder" },
+              "attribute": "intermediate-order",
+              "default": "forward"
+            },
+            {
+              "kind": "method",
+              "name": "spinTo",
+              "parameters": [
+                { "name": "target", "type": { "text": "string" } },
+                {
+                  "name": "options",
+                  "type": { "text": "SpinOptions" },
+                  "optional": true
+                }
+              ],
+              "return": { "type": { "text": "Promise<boolean>" } }
+            },
+            { "kind": "method", "name": "pause" },
+            { "kind": "method", "name": "resume" },
+            { "kind": "method", "name": "cancel" }
+          ],
+          "attributes": [
+            { "name": "name", "fieldName": "name" },
+            { "name": "value", "fieldName": "value" },
+            {
+              "name": "reel",
+              "fieldName": "reel",
+              "description": "A non-empty JSON array of strings when authored in HTML."
+            },
+            { "name": "preset", "fieldName": "preset" },
+            { "name": "span", "fieldName": "span" },
+            { "name": "flip-duration", "fieldName": "flipDuration" },
+            { "name": "spin-duration", "fieldName": "spinDuration" },
+            { "name": "intermediate-order", "fieldName": "intermediateOrder" }
+          ],
+          "events": [
+            {
+              "name": "sfe-flip-start",
+              "type": { "text": "CustomEvent<SplitFlapEventDetail>" }
+            },
+            {
+              "name": "sfe-flip",
+              "type": { "text": "CustomEvent<SplitFlapEventDetail>" }
+            },
+            {
+              "name": "sfe-settle",
+              "type": { "text": "CustomEvent<SplitFlapEventDetail>" }
+            },
+            {
+              "name": "sfe-config-error",
+              "type": { "text": "CustomEvent<SplitFlapEventDetail>" }
+            }
+          ],
+          "cssProperties": [
+            { "name": "--sfe-font-family" },
+            { "name": "--sfe-font-size" },
+            { "name": "--sfe-font-weight" },
+            { "name": "--sfe-letter-spacing" },
+            { "name": "--sfe-value-size" },
+            { "name": "--sfe-cell-width" },
+            { "name": "--sfe-cell-height" },
+            { "name": "--sfe-cell-background" },
+            { "name": "--sfe-cell-color" },
+            { "name": "--sfe-cell-border" },
+            { "name": "--sfe-cell-radius" },
+            { "name": "--sfe-cell-shadow" },
+            { "name": "--sfe-split-line" },
+            {
+              "name": "--sfe-step-duration",
+              "description": "Managed internally from flipDuration."
+            }
+          ],
+          "cssParts": [
+            { "name": "cell" },
+            { "name": "top" },
+            { "name": "bottom" },
+            { "name": "moving-top" },
+            { "name": "moving-bottom" },
+            { "name": "split-line" }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "SfeCell",
+          "declaration": { "name": "SfeCell", "module": "dist/cell.js" }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "sfe-cell",
+          "declaration": { "name": "SfeCell", "module": "dist/cell.js" }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "dist/board.js",
+      "declarations": [
+        {
+          "kind": "class",
+          "name": "SfeBoard",
+          "description": "Coordinates named split-flap cells through a JavaScript sequence of frames.",
+          "customElement": true,
+          "tagName": "sfe-board",
+          "superclass": { "name": "HTMLElement" },
+          "members": [
+            {
+              "kind": "field",
+              "name": "sequence",
+              "type": { "text": "readonly SequenceFrame[]" }
+            },
+            {
+              "kind": "field",
+              "name": "cells",
+              "type": { "text": "SfeCell[]" },
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "currentFrame",
+              "type": { "text": "number" },
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "playbackState",
+              "type": { "text": "PlaybackState" },
+              "readonly": true
+            },
+            {
+              "kind": "field",
+              "name": "autoplay",
+              "type": { "text": "boolean" },
+              "attribute": "autoplay"
+            },
+            {
+              "kind": "field",
+              "name": "loop",
+              "type": { "text": "boolean" },
+              "attribute": "loop"
+            },
+            {
+              "kind": "field",
+              "name": "announce",
+              "type": { "text": "boolean" },
+              "attribute": "announce"
+            },
+            {
+              "kind": "method",
+              "name": "play",
+              "return": { "type": { "text": "Promise<void>" } }
+            },
+            { "kind": "method", "name": "pause" },
+            { "kind": "method", "name": "resume" },
+            { "kind": "method", "name": "stop" },
+            {
+              "kind": "method",
+              "name": "replay",
+              "return": { "type": { "text": "Promise<void>" } }
+            },
+            {
+              "kind": "method",
+              "name": "next",
+              "return": { "type": { "text": "Promise<void>" } }
+            },
+            {
+              "kind": "method",
+              "name": "previous",
+              "return": { "type": { "text": "Promise<void>" } }
+            },
+            {
+              "kind": "method",
+              "name": "seek",
+              "parameters": [{ "name": "index", "type": { "text": "number" } }],
+              "return": { "type": { "text": "Promise<void>" } }
+            }
+          ],
+          "attributes": [
+            { "name": "autoplay", "fieldName": "autoplay" },
+            { "name": "loop", "fieldName": "loop" },
+            { "name": "announce", "fieldName": "announce" }
+          ],
+          "events": [
+            {
+              "name": "sfe-frame-start",
+              "type": { "text": "CustomEvent<SplitFlapEventDetail>" }
+            },
+            {
+              "name": "sfe-frame-settle",
+              "type": { "text": "CustomEvent<SplitFlapEventDetail>" }
+            },
+            {
+              "name": "sfe-sequence-start",
+              "type": { "text": "CustomEvent<SplitFlapEventDetail>" }
+            },
+            {
+              "name": "sfe-sequence-end",
+              "type": { "text": "CustomEvent<SplitFlapEventDetail>" }
+            },
+            {
+              "name": "sfe-playback-state",
+              "type": { "text": "CustomEvent<SplitFlapEventDetail>" }
+            },
+            {
+              "name": "sfe-config-error",
+              "type": { "text": "CustomEvent<SplitFlapEventDetail>" }
+            }
+          ],
+          "cssProperties": [
+            { "name": "--sfe-board-background" },
+            { "name": "--sfe-board-padding" },
+            { "name": "--sfe-board-gap" },
+            { "name": "--sfe-board-radius" },
+            { "name": "--sfe-board-border" }
+          ],
+          "cssParts": [{ "name": "board" }, { "name": "grid" }]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "SfeBoard",
+          "declaration": { "name": "SfeBoard", "module": "dist/board.js" }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "sfe-board",
+          "declaration": { "name": "SfeBoard", "module": "dist/board.js" }
+        }
+      ]
+    }
+  ]
+}

@@ -5,6 +5,7 @@ on:
     branches: [main]
 
 permissions:
+  actions: write
   contents: write
   pull-requests: write
   id-token: write
@@ -30,6 +31,16 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
+      - if: steps.release.outputs.prs_created == 'true'
+        name: Run CI for the Release Please branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_PRS: ${{ steps.release.outputs.prs }}
+        run: |
+          PR_NUMBER=$(node -e 'process.stdout.write(String(JSON.parse(process.env.RELEASE_PRS)[0].number))')
+          RELEASE_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq .headRefName)
+          gh workflow run ci.yml --ref "$RELEASE_BRANCH"
+
       - if: steps.release.outputs.release_created == 'true'
         name: Check out the released commit
         uses: actions/checkout@v6
@@ -48,6 +59,8 @@ jobs:
           test "$PACKAGE_VERSION" = "$RELEASE_VERSION"
           grep -F "## $RELEASE_VERSION (" CHANGELOG.md
           PACKAGE_FILE=$(npm pack --json | node -e "let input=''; process.stdin.on('data', c => input += c).on('end', () => process.stdout.write(JSON.parse(input)[0].filename))")
+          node scripts/check-package.mjs "$PACKAGE_FILE"
+          test "${{ steps.release.outputs.tag_name }}" = "split-flap-elements-v$PACKAGE_VERSION"
           shasum -a 256 "$PACKAGE_FILE" > "$PACKAGE_FILE.sha256"
           echo "file=$PACKAGE_FILE" >> "$GITHUB_OUTPUT"
 
