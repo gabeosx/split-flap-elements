@@ -32,6 +32,7 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           if [ -z "$PR_TITLE" ]; then
             PR_TITLE=$(gh pr list --head "$GITHUB_REF_NAME" --state open --json title --jq '.[0].title // ""')
