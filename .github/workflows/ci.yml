@@ -4,9 +4,11 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   validate:
@@ -23,11 +25,16 @@ jobs:
       - run: npm run validate
 
   pull-request-title:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Validate Conventional Commit title
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          if [ -z "$PR_TITLE" ]; then
+            PR_TITLE=$(gh pr list --head "$GITHUB_REF_NAME" --state open --json title --jq '.[0].title // ""')
+          fi
+          export PR_TITLE
           node -e 'const title = process.env.PR_TITLE ?? ""; const pattern = /^(feat|fix|perf|refactor|docs|test|build|ci|chore)(\([^)]+\))?!?: .+/; if (!pattern.test(title)) { console.error("Use a Conventional Commit pull-request title."); process.exit(1); }'
